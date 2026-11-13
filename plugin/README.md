@@ -68,8 +68,15 @@ the bot's settings. Running it again reuses what exists; `--newtoken` replaces t
 ## Privacy
 
 The plugin stores which chat app account belongs to which user (`local_darimaa_links`). Users can
-disconnect at any time, and the privacy API exports and deletes these records. When the bot answers,
-the user's first name and the names and due dates of their activities are sent to the chat app.
+disconnect at any time, and the privacy API exports and deletes these records.
+
+The assistant bot's server gets data only about users who connected their chat app account: the
+first name, the time zone, whether the user can send reminders, and the names, courses, due dates
+and links of the activities the user still has to do. Teachers also get their assignments with the
+number of students who have not submitted, without student names. The bot passes the first name,
+the activities and the teacher overview on to the chat app when it answers. It never gets a
+username, email address, ID number or user id.
+
 Reminders are delivered by the Moodle messaging system, which keeps its own records.
 
 ## Development

@@ -16,11 +16,16 @@
 
 namespace local_darimaa\privacy;
 
+use core_privacy\local\metadata\collection;
+use core_privacy\local\metadata\types\database_table;
+use core_privacy\local\metadata\types\external_location;
 use core_privacy\local\request\approved_contextlist;
 use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use core_privacy\tests\provider_testcase;
+use local_darimaa\external\get_user;
+use local_darimaa\external\link_account;
 use local_darimaa\local\link_manager;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -45,6 +50,49 @@ final class provider_test extends provider_testcase {
             link_manager::link('messenger', link_manager::create_code($user->id, 'messenger'), 'psid-' . $i);
         }
         return $users;
+    }
+
+    /**
+     * The metadata names every stored field and every item that leaves Moodle.
+     */
+    public function test_metadata_declares_stored_and_shared_data(): void {
+        global $DB;
+
+        $items = [];
+        foreach (provider::get_metadata(new collection('local_darimaa'))->get_collection() as $item) {
+            $items[$item->get_name()] = $item;
+        }
+        $this->assertEqualsCanonicalizing(['local_darimaa_links', 'bot', 'chatapps', 'core_message'], array_keys($items));
+
+        // Every column of the link table except the record id.
+        $this->assertInstanceOf(database_table::class, $items['local_darimaa_links']);
+        $columns = array_diff(array_keys($DB->get_columns('local_darimaa_links')), ['id']);
+        $this->assertEqualsCanonicalizing($columns, array_keys($items['local_darimaa_links']->get_privacy_fields()));
+
+        // What the web service functions give to the bot's server, and what the bot passes on to the chat app.
+        $this->assertInstanceOf(external_location::class, $items['bot']);
+        $botfields = array_keys($items['bot']->get_privacy_fields());
+        $this->assertEqualsCanonicalizing(['firstname', 'timezone', 'isteacher', 'deadlines', 'missing'], $botfields);
+        $this->assertInstanceOf(external_location::class, $items['chatapps']);
+        $this->assertEqualsCanonicalizing(
+            ['firstname', 'deadlines', 'missing'],
+            array_keys($items['chatapps']->get_privacy_fields())
+        );
+
+        // Every field about a person that the user functions return is declared for the bot.
+        foreach ([get_user::class, link_account::class] as $function) {
+            $returned = array_diff(array_keys($function::execute_returns()->keys), ['linked', 'linkurl']);
+            $this->assertSame([], array_values(array_diff($returned, $botfields)), $function);
+        }
+
+        // Every description exists as a language string.
+        $strings = get_string_manager();
+        foreach ($items as $item) {
+            $this->assertTrue($strings->string_exists($item->get_summary(), 'local_darimaa'), $item->get_summary());
+            foreach ($item->get_privacy_fields() as $identifier) {
+                $this->assertTrue($strings->string_exists($identifier, 'local_darimaa'), $identifier);
+            }
+        }
     }
 
     /**

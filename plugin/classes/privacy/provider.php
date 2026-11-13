@@ -49,12 +49,26 @@ class provider implements
             'userid' => 'privacy:metadata:links:userid',
             'channel' => 'privacy:metadata:links:channel',
             'externalid' => 'privacy:metadata:links:externalid',
+            'code' => 'privacy:metadata:links:code',
+            'codeexpires' => 'privacy:metadata:links:codeexpires',
             'timecreated' => 'privacy:metadata:links:timecreated',
+            'timemodified' => 'privacy:metadata:links:timemodified',
         ], 'privacy:metadata:links');
 
+        // What the web service functions give to the assistant bot's server.
+        $collection->add_external_location_link('bot', [
+            'firstname' => 'privacy:metadata:bot:firstname',
+            'timezone' => 'privacy:metadata:bot:timezone',
+            'isteacher' => 'privacy:metadata:bot:isteacher',
+            'deadlines' => 'privacy:metadata:bot:deadlines',
+            'missing' => 'privacy:metadata:bot:missing',
+        ], 'privacy:metadata:bot');
+
+        // What the bot passes on to the chat app when it answers.
         $collection->add_external_location_link('chatapps', [
             'firstname' => 'privacy:metadata:chatapps:firstname',
             'deadlines' => 'privacy:metadata:chatapps:deadlines',
+            'missing' => 'privacy:metadata:chatapps:missing',
         ], 'privacy:metadata:chatapps');
 
         $collection->add_subsystem_link('core_message', [], 'privacy:metadata:coremessage');
