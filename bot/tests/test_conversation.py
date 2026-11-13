@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -11,6 +12,7 @@ from darimaa_bot.messenger import Incoming
 
 from .fakes import FakeMessenger, FakeMoodle
 
+BOT_ROOT = Path(__file__).resolve().parent.parent
 UB = ZoneInfo("Asia/Ulaanbaatar")
 NOW = datetime(2026, 11, 6, 10, 0, tzinfo=UB).timestamp()  # Friday morning
 
@@ -182,3 +184,20 @@ def test_get_user_fake_matches_the_fields_the_bot_reads(setup):
     # The bot answers a linked user from these fields alone.
     run(bot.handle(tap("psid-a", "GET_STARTED", "k1")))
     assert "Сайн байна уу, Anu!" in messenger.last().text
+
+
+def test_time_zones_come_from_the_time_zone_database(setup):
+    bot, _, _ = setup
+    assert bot.zone("Asia/Ulaanbaatar").key == "Asia/Ulaanbaatar"
+    assert bot.zone("Europe/Berlin").key == "Europe/Berlin"
+    # Unknown or empty names fall back to the bot's own zone, not to UTC.
+    assert bot.zone("Mars/Olympus").key == "Asia/Ulaanbaatar"
+    assert bot.zone(None).key == "Asia/Ulaanbaatar"
+
+
+def test_runtime_requirements_are_pinned_and_include_tzdata():
+    lines = [line.strip() for line in (BOT_ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()]
+    lines = [line for line in lines if line and not line.startswith("#")]
+    assert all("==" in line for line in lines)
+    # Windows has no time zone database of its own.
+    assert any(line.startswith("tzdata==") for line in lines)
