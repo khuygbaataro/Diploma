@@ -136,6 +136,35 @@ class missing_submissions {
     }
 
     /**
+     * Returns the students whose own due date is later than a given time.
+     *
+     * These students have an extension or a user override. Two queries cover the whole
+     * assignment. Group overrides are not looked at.
+     *
+     * @param \assign $assign The assignment.
+     * @param int $time The time to compare with.
+     * @return bool[] True keyed by user id.
+     */
+    public static function get_users_with_later_duedate(\assign $assign, int $time): array {
+        global $DB;
+
+        $params = ['assignment' => $assign->get_instance()->id, 'time' => $time];
+        $extended = $DB->get_fieldset_select(
+            'assign_user_flags',
+            'userid',
+            'assignment = :assignment AND extensionduedate > :time',
+            $params
+        );
+        $overridden = $DB->get_fieldset_select(
+            'assign_overrides',
+            'userid',
+            'assignid = :assignment AND userid IS NOT NULL AND duedate > :time',
+            $params
+        );
+        return array_fill_keys(array_merge($extended, $overridden), true);
+    }
+
+    /**
      * Lists the assignments in a course with the number of missing submissions.
      *
      * Only assignments the current user can send reminders for are included.
