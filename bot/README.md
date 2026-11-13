@@ -1,12 +1,14 @@
 # Багш, оюутны туслах: Messenger бот
 
-Оюутан, багш Facebook Messenger-ээр дамжуулан Moodle-ээс мэдээлэл авдаг бот. Moodle-ийн `local_darimaa` plugin-ий 0.2.0 ба түүнээс шинэ хувилбартай хамт ажиллана.
+Оюутан, багш Facebook Messenger-ээр дамжуулан Moodle-ээс мэдээлэл авдаг бот. Moodle-ийн `local_darimaa` plugin-ий 0.3.0 ба түүнээс шинэ хувилбартай хамт ажиллана.
 
 Техникийн нэр нь `local_darimaa` (plugin), `darimaa-bot` (бот) хэвээр үлдсэн. Хэрэглэгчид зөвхөн «Багш, оюутны туслах» гэсэн нэрийг харна.
 
 **Юу хийдэг вэ:**
 - Оюутанд ойрын 7 хоногийн даалгавар, сорил болон хоцорсон ажлыг харуулна.
 - Багшид даалгавраа илгээгээгүй оюутнуудыг харуулна. Багш баталсны дараа тэдэнд сануулга явуулна.
+- Багшид хичээлийнхээ идэвхгүй оюутнуудыг харуулна (0.3.0). Зөвхөн харуулна, оюутанд юу ч явуулахгүй.
+- Багшид сорилын дүнг сэдэв тус бүрээр, сул сэдэвтэй оюутнуудын хамт харуулна (0.3.0). Зөвхөн харуулна.
 - Хүн бүр Moodle-ээс авсан нэг удаагийн кодоор Messenger-ээ Moodle данстайгаа холбоно. Нууц үг чатаар дамжихгүй.
 
 **Хэрхэн ажилладаг вэ:** Messenger → Meta → энэ бот (таны сервер, `127.0.0.1:8100`) → Moodle-ийн REST API → хариу Meta-гаар буцна. Бот, Moodle хоёр нэг сервер дээр ажиллаж болно.
@@ -15,7 +17,7 @@
 
 ## 1. Moodle тал
 
-1. `local_darimaa-0.2.2.zip` файлыг Site administration → Plugins → Install plugins хэсгээр оруулна. Хуучин хувилбар шинэчлэгдэнэ.
+1. `local_darimaa-0.3.0.zip` файлыг Site administration → Plugins → Install plugins хэсгээр оруулна. Хуучин хувилбар шинэчлэгдэнэ.
 2. Сервер дээр ботын токен үүсгэнэ. Moodle-ийн хавтас руу (`config.php` байгаа газар) орж ажиллуулна:
 
    ```bash
@@ -32,7 +34,7 @@
 Компьютер дээрээ (Windows CMD) ZIP файлаа сервер рүү хуулна:
 
 ```bat
-scp %USERPROFILE%\Downloads\darimaa-bot-0.2.2.zip moodle@SERVER-IP:~/
+scp %USERPROFILE%\Downloads\darimaa-bot-0.3.0.zip moodle@SERVER-IP:~/
 ```
 
 Сервер дээр:
@@ -40,7 +42,7 @@ scp %USERPROFILE%\Downloads\darimaa-bot-0.2.2.zip moodle@SERVER-IP:~/
 ```bash
 sudo apt install -y python3-venv unzip
 sudo useradd --system --home /opt/darimaa-bot --shell /usr/sbin/nologin darimaa
-sudo unzip ~/darimaa-bot-0.2.2.zip -d /opt/
+sudo unzip ~/darimaa-bot-0.3.0.zip -d /opt/
 sudo python3 -m venv /opt/darimaa-bot/venv
 sudo /opt/darimaa-bot/venv/bin/pip install -r /opt/darimaa-bot/requirements.txt
 sudo cp /opt/darimaa-bot/.env.example /opt/darimaa-bot/.env
@@ -107,6 +109,7 @@ Moodle чинь https-гүй, эсвэл зөвхөн IP хаягаар нээг
 2. Гарч ирсэн кодыг Page руу Messenger-ээр бичнэ. Бот «Боллоо, ...!» гэж хариулна.
 3. «7 хоногийн ажил» товч дарна.
 4. Багшийн эрхээр мөн адил холбоод «Илгээгээгүй» товч дарна.
+5. Багшийн эрхээр «Идэвхгүй оюутан», «Сорилын дүн» товчийг дарж үзнэ.
 
 ## Асуудал гарвал
 
@@ -116,7 +119,47 @@ Moodle чинь https-гүй, эсвэл зөвхөн IP хаягаар нээг
 - Логт `Refused a webhook call with a wrong signature` гарвал `FB_APP_SECRET` буруу байна.
 - Бот хариулахгүй бол Page-ийн webhook subscribe хийгдсэн эсэх, бичиж байгаа хүн app-д tester эрхтэй эсэхийг шалгана.
 
+## Багшийн тайлан (0.3.0)
+
+Багш дараах хоёр зүйлийг чатаар асууж болно. Хоёулаа зөвхөн мэдээлэл харуулна: оюутанд зурвас, сануулга явуулахгүй, Moodle дээр юу ч өөрчлөхгүй.
+
+| Юу бичих, дарах вэ | Бот юу хариулах вэ |
+| --- | --- |
+| «Идэвхгүй оюутан» товч, эсвэл «идэвхгүй», `idevhgui`, `inactive` гэж бичнэ | Хичээлд сүүлийн 7 хоногт ороогүй оюутнууд: оюутны код, нэр, хэд хоногийн өмнө орсон (эсвэл «огт ороогүй»), хичээлд зарцуулсан ойролцоо цаг, илгээгээгүй даалгаврын тоо. Хамгийн ихдээ 15 оюутан харуулна. |
+| «Сорилын дүн» товч, эсвэл «сорил», «сул сэдэв», `soril`, `quiz` гэж бичнэ | Сорилыг хэдэн оюутан өгсөн, өгөөгүй нь хэд вэ, сэдвүүдийн дундаж хувь (хамгийн сулаас нь), сул сэдэвтэй оюутнууд: код, нэр, сорилын хувь, шалгалтын ойролцоо оноо, сул сэдвүүд. Хамгийн ихдээ 15 оюутан харуулна. |
+
+- Багш хэд хэдэн хичээлтэй бол бот эхлээд аль хичээл болохыг асууна. Нэг хичээлтэй бол асуухгүй.
+- Сорилын жагсаалтад зөвхөн оюутан өгсөн сорил гарна.
+- Цаг нь Moodle-ийн бүртгэлээс (лог) тооцсон ойролцоо тоо. Moodle дээр стандарт лог унтраалттай бол цаг гарахгүй.
+- Шалгалтын ойролцоо оноо = сорилын хувь × `EXAM_POINTS` / 100. Үргэлж «≈» тэмдэгтэй гарна. Энэ бол жинхэнэ шалгалтын оноо биш, зөвхөн тооцоо.
+- Багш биш хүн эдгээрийг асуувал өөрийнх нь 7 хоногийн ажлыг харуулна. Багшийн мэдээлэл түүнд очихгүй.
+- Багш юу харахыг Moodle шийднэ: зөвхөн өөрийн хичээл, тусдаа бүлэгтэй бол өөрийн бүлгийн оюутнууд.
+- Оюутны нэр, код, дүн ботын логт бичигдэхгүй.
+
+### Шинэ тохиргоо (`.env`)
+
+| Нэр | Анхны утга | Тайлбар |
+| --- | --- | --- |
+| `WEAK_TOPIC_BELOW` | `60` | Сэдвийн хувь үүнээс доош бол «сул сэдэв» гэж үзнэ. |
+| `EXAM_POINTS` | `30` | Улирлын шалгалтын оноо. Шалгалтын ойролцоо оноог үүгээр тооцно. |
+
+Хоёуланг нь бичихгүй орхиж болно. Тэгвэл анхны утгаар ажиллана. Өөрчилсний дараа `sudo systemctl restart darimaa-bot` гэж ажиллуулна.
+
+Оюутны код Moodle-ийн аль талбарт байгааг plugin-ий тохиргооноос сонгоно (Site administration → Plugins → Local plugins → Teacher & Student Assistant → Student code field).
+
 ## Өөрчлөлт
+
+### 0.3.0 (2026-11-13)
+
+Багшийн хоёр тайлан нэмсэн. Plugin-ий 0.3.0 ба түүнээс шинэ хувилбар шаардлагатай.
+
+- «Идэвхгүй оюутан»: хичээлийн идэвхгүй оюутнуудын жагсаалт.
+- «Сорилын дүн»: сорилын дүн сэдэв тус бүрээр, сул сэдэвтэй оюутнууд, шалгалтын ойролцоо оноо.
+- Шинэ тохиргоо: `WEAK_TOPIC_BELOW`, `EXAM_POINTS`.
+- Багшийн цэс, тусламжид хоёр шинэ мөр нэмэгдсэн.
+- Өмнөх боломжууд (7 хоногийн ажил, хоцорсон ажил, илгээгээгүй, сануулга) өөрчлөгдөөгүй.
+
+Шинэчлэхдээ эхлээд plugin-аа 0.3.0 болгоно. Дараа нь ботын шинэ файлуудыг `/opt/darimaa-bot` руу хуулаад `sudo systemctl restart darimaa-bot` гэж ажиллуулна. Шинээр суулгах сан байхгүй.
 
 ### 0.2.2 (2026-11-13)
 
@@ -139,6 +182,6 @@ sudo systemctl restart darimaa-bot
 
 - Тест ажиллуулах: `pip install -r requirements-dev.txt && pytest`
 - Ботын бүх текст `darimaa_bot/texts.py`-д, яриа удирдах логик `darimaa_bot/conversation.py`-д байна.
-- Moodle-ийн функцүүд: `local_darimaa_get_user`, `local_darimaa_link_account`, `local_darimaa_unlink_account`, `local_darimaa_get_deadlines`, `local_darimaa_get_missing`, `local_darimaa_send_reminders`.
+- Moodle-ийн функцүүд: `local_darimaa_get_user`, `local_darimaa_link_account`, `local_darimaa_unlink_account`, `local_darimaa_get_deadlines`, `local_darimaa_get_missing`, `local_darimaa_send_reminders`, `local_darimaa_get_courses`, `local_darimaa_get_inactive_students`, `local_darimaa_get_quiz_topic_results`.
 
 Эх сурвалж: [Messenger Platform overview](https://developers.facebook.com/docs/messenger-platform/overview)

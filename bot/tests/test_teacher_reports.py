@@ -479,3 +479,18 @@ def test_quick_reply_titles_fit_in_twenty_characters(setup):
     # The menu words lead to the reports when a teacher types them instead of tapping.
     assert intent(texts.MENU_INACTIVE) == "INACTIVE"
     assert intent(texts.MENU_QUIZ) == "QUIZ"
+
+
+# Release.
+
+
+def test_release_is_0_3_0_and_the_readme_names_what_is_new():
+    from pathlib import Path
+
+    import darimaa_bot
+
+    assert darimaa_bot.__version__ == "0.3.0"
+    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
+    for needed in ("0.3.0", "WEAK_TOPIC_BELOW", "EXAM_POINTS", texts.MENU_INACTIVE, texts.MENU_QUIZ,
+                   "local_darimaa_get_inactive_students", "local_darimaa_get_quiz_topic_results"):
+        assert needed in readme, needed
