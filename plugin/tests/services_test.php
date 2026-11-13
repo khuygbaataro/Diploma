@@ -51,4 +51,45 @@ final class services_test extends \advanced_testcase {
         $this->assertSame('Darimaa bot', $service->name);
         $this->assertSame('local_darimaa_bot', $service->shortname);
     }
+
+    /**
+     * The service offers nine functions, all only for the bot. The three reports for teachers are read-only.
+     */
+    public function test_service_has_nine_functions(): void {
+        global $DB;
+
+        $functions = [];
+        $services = [];
+        require(\core_component::get_plugin_directory('local', 'darimaa') . '/db/services.php');
+
+        $expected = [
+            'local_darimaa_get_user' => 'read',
+            'local_darimaa_link_account' => 'write',
+            'local_darimaa_unlink_account' => 'write',
+            'local_darimaa_get_deadlines' => 'read',
+            'local_darimaa_get_missing' => 'read',
+            'local_darimaa_send_reminders' => 'write',
+            'local_darimaa_get_courses' => 'read',
+            'local_darimaa_get_inactive_students' => 'read',
+            'local_darimaa_get_quiz_topic_results' => 'read',
+        ];
+        $this->assertCount(9, $services['Darimaa bot']['functions']);
+        $this->assertSame(array_keys($expected), $services['Darimaa bot']['functions']);
+        $this->assertSame($expected, array_map(static fn(array $function): string => $function['type'], $functions));
+        foreach ($functions as $name => $function) {
+            $this->assertSame('local/darimaa:botaccess', $function['capabilities'], $name);
+            $this->assertTrue(class_exists($function['classname']), $name);
+        }
+
+        // Moodle installed all nine and put them in the service.
+        $service = $DB->get_record('external_services', ['shortname' => 'local_darimaa_bot'], '*', MUST_EXIST);
+        $inservice = $DB->get_fieldset_select(
+            'external_services_functions',
+            'functionname',
+            'externalserviceid = :serviceid',
+            ['serviceid' => $service->id]
+        );
+        $this->assertEqualsCanonicalizing(array_keys($expected), $inservice);
+        $this->assertSame(9, $DB->count_records('external_functions', ['component' => 'local_darimaa']));
+    }
 }

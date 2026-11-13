@@ -61,6 +61,24 @@ $functions = [
         'type' => 'write',
         'capabilities' => 'local/darimaa:botaccess',
     ],
+    'local_darimaa_get_courses' => [
+        'classname' => \local_darimaa\external\get_courses::class,
+        'description' => 'Lists the courses and quizzes of a linked teacher.',
+        'type' => 'read',
+        'capabilities' => 'local/darimaa:botaccess',
+    ],
+    'local_darimaa_get_inactive_students' => [
+        'classname' => \local_darimaa\external\get_inactive_students::class,
+        'description' => 'Shows a linked teacher the last access, time spent and missing assignments of the students of a course.',
+        'type' => 'read',
+        'capabilities' => 'local/darimaa:botaccess',
+    ],
+    'local_darimaa_get_quiz_topic_results' => [
+        'classname' => \local_darimaa\external\get_quiz_topic_results::class,
+        'description' => 'Shows a linked teacher the results of a quiz by topic.',
+        'type' => 'read',
+        'capabilities' => 'local/darimaa:botaccess',
+    ],
 ];
 
 $services = [
@@ -73,6 +91,9 @@ $services = [
             'local_darimaa_get_deadlines',
             'local_darimaa_get_missing',
             'local_darimaa_send_reminders',
+            'local_darimaa_get_courses',
+            'local_darimaa_get_inactive_students',
+            'local_darimaa_get_quiz_topic_results',
         ],
         'requiredcapability' => 'local/darimaa:botaccess',
         'restrictedusers' => 0,
