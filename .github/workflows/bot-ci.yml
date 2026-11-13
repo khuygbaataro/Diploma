@@ -1,5 +1,6 @@
 name: Bot CI
 
+# Runs only when the bot or this workflow file changes.
 on:
   push:
     paths:

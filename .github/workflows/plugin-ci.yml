@@ -1,5 +1,6 @@
 name: Moodle Plugin CI
 
+# Runs only when the plugin or this workflow file changes.
 on:
   push:
     paths:
