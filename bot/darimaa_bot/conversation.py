@@ -34,6 +34,9 @@ KEYWORDS: list[tuple[str, list[str]]] = [
     ("UNLINK", ["салгах", "салга", "salgah", "unlink"]),
     ("OVERDUE", ["хоцорсон", "хоцорч", "хэтэрсэн", "hotsorson", "hocorson", "overdue"]),
     ("MISSING", ["илгээгээгүй", "сануулга", "ilgeegeegui", "sanuulga", "missing"]),
+    # The two teacher reports come before PLAN, so that «Сорилын хугацаа» asks about a quiz.
+    ("INACTIVE", ["идэвхгүй", "идэвхигүй", "idevhgui", "idewhgui", "inactive"]),
+    ("QUIZ", ["сорил", "сул сэдэв", "soril", "sul sedev", "quiz"]),
     ("PLAN", [
         "7 хоног", "долоо хоног", "төлөвлөгөө", "хугацаа", "даалгавар", "юу хийх", "хийх ажил",
         "7 honog", "doloo honog", "tolovlogoo", "hugatsaa", "daalgavar", "yu hiih", "deadline", "plan",

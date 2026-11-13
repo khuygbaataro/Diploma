@@ -6,7 +6,7 @@ import logging
 import pytest
 
 from darimaa_bot import texts
-from darimaa_bot.conversation import Bot
+from darimaa_bot.conversation import Bot, intent
 from darimaa_bot.messenger import Incoming
 
 from .fakes import FakeMessenger, FakeMoodle, course, inactive_student, quiz, quiz_student
@@ -383,3 +383,62 @@ def test_student_who_taps_a_report_gets_their_own_plan(setup):
         assert messenger.last().text.startswith("Ойрын 7 хоногт хийх ажил алга")
     assert "get_courses" not in moodle.calls
     assert moodle.calls.count("get_deadlines") == 2
+
+
+# Asking in words.
+
+
+def test_new_intents_and_the_old_ones():
+    assert intent("идэвхгүй оюутнууд") == "INACTIVE"
+    assert intent("Идэвхгүй оюутан хэн байна?") == "INACTIVE"
+    assert intent("idevhgui oyutan") == "INACTIVE"
+    assert intent("inactive students") == "INACTIVE"
+    assert intent("Сорил 1-ийн дүн") == "QUIZ"
+    assert intent("сул сэдэв") == "QUIZ"
+    assert intent("soril 2") == "QUIZ"
+    assert intent("Quiz results") == "QUIZ"
+    # Both a report and PLAN match here. The report wins.
+    assert intent("Сорилын хугацаа хэзээ вэ?") == "QUIZ"
+    assert intent("идэвхгүй оюутны даалгавар") == "INACTIVE"
+
+    # The phrases of the older intents still mean the same.
+    assert intent("Энэ 7 хоногт юу хийх вэ?") == "PLAN"
+    assert intent("hugatsaa heterseng haruul") == "PLAN"
+    assert intent("7 хоногийн ажил") == "PLAN"
+    assert intent("Хугацаа хэтэрсэн ажил") == "OVERDUE"
+    assert intent("Хоцорсон ажил") == "OVERDUE"
+    assert intent("хоцорсон сорил") == "OVERDUE"
+    assert intent("илгээгээгүй хүмүүс") == "MISSING"
+    assert intent("сануулга") == "MISSING"
+    assert intent("салгах") == "UNLINK"
+    assert intent("sain uu") == "HELP"
+    assert intent("цаг агаар") == ""
+
+
+def test_teacher_asks_for_the_reports_in_words(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+    moodle.inactive[12] = {"students": [inactive_student("B200910003", "Саруул Тэмүүлэн", dayssince=-1)]}
+
+    run(bot.handle(text(TEACHER, "идэвхгүй оюутнууд", "k1")))
+    assert messenger.last().text.startswith("«Биологи 101»: идэвхгүй 1 оюутан")
+
+    run(bot.handle(text(TEACHER, "Сорил 1-ийн дүн", "k2")))
+    assert messenger.last().text.startswith("«Биологи 101» хичээлийн сорилууд:")
+
+
+def test_student_who_asks_in_words_gets_no_teacher_data(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+    moodle.links["psid-other-teacher"] = 9
+    moodle.inactive[12] = {"students": [inactive_student("B200910003", "Саруул Тэмүүлэн", dayssince=-1)]}
+
+    for number, words in enumerate(("идэвхгүй оюутнууд", "Сорил 1-ийн дүн", "сул сэдэв")):
+        run(bot.handle(text(STUDENT, words, f"k{number}")))
+        # The student gets the same answer as for their plan.
+        assert messenger.last().text.startswith("Ойрын 7 хоногт хийх ажил алга")
+
+    everything = " ".join(messenger.texts())
+    for private in ("Саруул", "B2009", "Биологи 101", "Сорил 1"):
+        assert private not in everything
+    assert not {"get_courses", "get_inactive_students", "get_quiz_topic_results"} & set(moodle.calls)
