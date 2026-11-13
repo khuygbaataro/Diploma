@@ -442,3 +442,40 @@ def test_student_who_asks_in_words_gets_no_teacher_data(setup):
     for private in ("Саруул", "B2009", "Биологи 101", "Сорил 1"):
         assert private not in everything
     assert not {"get_courses", "get_inactive_students", "get_quiz_topic_results"} & set(moodle.calls)
+
+
+# Menu and help.
+
+
+def test_teachers_get_the_two_reports_in_menu_and_help(setup):
+    bot, moodle, messenger = setup
+
+    run(bot.handle(tap(TEACHER, "HELP", "k1")))
+    reply = messenger.last()
+    assert reply.quick_replies == [
+        ("7 хоногийн ажил", "PLAN"),
+        ("Хоцорсон ажил", "OVERDUE"),
+        ("Илгээгээгүй", "MISSING"),
+        ("Идэвхгүй оюутан", "INACTIVE"),
+        ("Сорилын дүн", "QUIZ"),
+        ("Тусламж", "HELP"),
+    ]
+    assert "• «Идэвхгүй оюутан»: хичээлдээ сүүлийн 7 хоногт ороогүй оюутнууд" in reply.text
+    assert "• «Сорилын дүн»: сорилын дүн сэдэв тус бүрээр, сул сэдэвтэй оюутнууд" in reply.text
+
+    # Students keep their short menu and help.
+    run(bot.handle(tap(STUDENT, "HELP", "k2")))
+    reply = messenger.last()
+    assert [payload for _, payload in reply.quick_replies] == ["PLAN", "OVERDUE", "HELP"]
+    assert "Идэвхгүй" not in reply.text
+    assert "Сорилын дүн" not in reply.text
+
+
+def test_quick_reply_titles_fit_in_twenty_characters(setup):
+    bot, _, _ = setup
+    titles = [title for title, _ in bot.menu({"isteacher": True})]
+    titles += [texts.YES_SEND, texts.YES_UNLINK, texts.NO]
+    assert all(len(title) <= 20 for title in titles), titles
+    # The menu words lead to the reports when a teacher types them instead of tapping.
+    assert intent(texts.MENU_INACTIVE) == "INACTIVE"
+    assert intent(texts.MENU_QUIZ) == "QUIZ"

@@ -419,6 +419,8 @@ class Bot:
         choices = [(texts.MENU_PLAN, "PLAN"), (texts.MENU_OVERDUE, "OVERDUE")]
         if user.get("isteacher"):
             choices.append((texts.MENU_MISSING, "MISSING"))
+            choices.append((texts.MENU_INACTIVE, "INACTIVE"))
+            choices.append((texts.MENU_QUIZ, "QUIZ"))
         choices.append((texts.MENU_HELP, "HELP"))
         return choices
 
