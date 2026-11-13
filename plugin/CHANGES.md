@@ -1,5 +1,17 @@
 # Changes
 
+## 0.2.2 (2026-11-13)
+
+Small fixes from the audit of 0.2.1. No new features and no database changes.
+
+- `local_darimaa_get_user` returns only what the bot reads: it no longer returns the user id, the
+  full name and the language. Its parameters are unchanged, and older bots keep working.
+- The privacy metadata lists every field of the link table and every item that reaches the bot's
+  server and the chat app.
+- When a user is deleted, their chat app link and any waiting code are removed at once.
+- A test guards the web service name "Darimaa bot" and its short name.
+- The coding style is checked with the `moodle-extra` standard.
+
 ## 0.2.1 (2026-11-13)
 
 - New name: Teacher & Student Assistant. The technical name stays `local_darimaa`, so existing

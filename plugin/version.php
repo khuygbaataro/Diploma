@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_darimaa';
-$plugin->version = 2026111300;
+$plugin->version = 2026111301;
 $plugin->requires = 2025041400; // Moodle 5.0.
 $plugin->supported = [500, 503];
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '0.2.1';
+$plugin->release = '0.2.2';

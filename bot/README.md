@@ -15,7 +15,7 @@
 
 ## 1. Moodle тал
 
-1. `local_darimaa-0.2.1.zip` файлыг Site administration → Plugins → Install plugins хэсгээр оруулна. Хуучин хувилбар шинэчлэгдэнэ.
+1. `local_darimaa-0.2.2.zip` файлыг Site administration → Plugins → Install plugins хэсгээр оруулна. Хуучин хувилбар шинэчлэгдэнэ.
 2. Сервер дээр ботын токен үүсгэнэ. Moodle-ийн хавтас руу (`config.php` байгаа газар) орж ажиллуулна:
 
    ```bash
@@ -32,7 +32,7 @@
 Компьютер дээрээ (Windows CMD) ZIP файлаа сервер рүү хуулна:
 
 ```bat
-scp %USERPROFILE%\Downloads\darimaa-bot-0.2.1.zip moodle@SERVER-IP:~/
+scp %USERPROFILE%\Downloads\darimaa-bot-0.2.2.zip moodle@SERVER-IP:~/
 ```
 
 Сервер дээр:
@@ -40,7 +40,7 @@ scp %USERPROFILE%\Downloads\darimaa-bot-0.2.1.zip moodle@SERVER-IP:~/
 ```bash
 sudo apt install -y python3-venv unzip
 sudo useradd --system --home /opt/darimaa-bot --shell /usr/sbin/nologin darimaa
-sudo unzip ~/darimaa-bot-0.2.1.zip -d /opt/
+sudo unzip ~/darimaa-bot-0.2.2.zip -d /opt/
 sudo python3 -m venv /opt/darimaa-bot/venv
 sudo /opt/darimaa-bot/venv/bin/pip install -r /opt/darimaa-bot/requirements.txt
 sudo cp /opt/darimaa-bot/.env.example /opt/darimaa-bot/.env
@@ -115,6 +115,25 @@ Moodle чинь https-гүй, эсвэл зөвхөн IP хаягаар нээг
 - Webhook verify амжилтгүй бол `FB_VERIFY_TOKEN` хоёр талд ижил эсэх, `https://ТАНЫ-ДОМЭЙН/darimaa-bot/healthz` нээгдэж байгаа эсэхийг шалгана.
 - Логт `Refused a webhook call with a wrong signature` гарвал `FB_APP_SECRET` буруу байна.
 - Бот хариулахгүй бол Page-ийн webhook subscribe хийгдсэн эсэх, бичиж байгаа хүн app-д tester эрхтэй эсэхийг шалгана.
+
+## Өөрчлөлт
+
+### 0.2.2 (2026-11-13)
+
+Шинэ боломж нэмээгүй. 0.2.1-ийн шалгалтаар олдсон жижиг алдаануудыг зассан.
+
+- Page-ийн access token-ийг хаягт (URL) биш, `Authorization` толгойд хийж илгээдэг болсон. Өмнө нь токен логт бичигддэг байсан. Бот өмнө нь ажиллаж байсан бол Meta дээр Page-ийн токеноо шинээр үүсгээд `.env`-д солино уу.
+- Логт Messenger-ийн хэрэглэгчийн ID бичигдэхгүй. Оронд нь түүний 12 тэмдэгттэй богино хэш бичигдэнэ.
+- Санаандгүй алдаа гарвал хэрэглэгч хариугүй үлдэхгүй. Бот алдааг логт бичээд «алдаа гарлаа» гэсэн хариу илгээнэ.
+- `tzdata` санг `requirements.txt`-д нэмсэн. Windows дээр цагийн бүсийн мэдээлэл байдаггүй тул өмнө нь тест ажилладаггүй байсан.
+- Plugin 0.2.2-т `local_darimaa_get_user` функц хэрэглэгчийн ID, бүтэн нэр, хэлийг буцаахаа больсон. Бот эдгээрийг ашигладаггүй тул plugin-ий 0.2.0, 0.2.1 хувилбартай ч хэвээр ажиллана.
+
+Шинэчлэхдээ шинэ файлуудаа `/opt/darimaa-bot` руу хуулаад дараах хоёр мөрийг ажиллуулна:
+
+```bash
+sudo /opt/darimaa-bot/venv/bin/pip install -r /opt/darimaa-bot/requirements.txt
+sudo systemctl restart darimaa-bot
+```
 
 ## Хөгжүүлэгчид
 
