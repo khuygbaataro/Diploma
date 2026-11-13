@@ -70,3 +70,28 @@ class MoodleClient:
             externalid=externalid,
             cmid=cmid,
         )
+
+    # The three functions below need plugin 0.3.0 or later. They only read data.
+
+    async def get_courses(self, externalid: str) -> dict[str, Any]:
+        """A teacher's courses with their quizzes."""
+        return await self.call("local_darimaa_get_courses", channel=self.channel, externalid=externalid)
+
+    async def get_inactive_students(self, externalid: str, courseid: int, days: int = 7) -> dict[str, Any]:
+        """Last access, time spent and missing work of the students of one course."""
+        return await self.call(
+            "local_darimaa_get_inactive_students",
+            channel=self.channel,
+            externalid=externalid,
+            courseid=courseid,
+            days=days,
+        )
+
+    async def get_quiz_topic_results(self, externalid: str, cmid: int) -> dict[str, Any]:
+        """The results of one quiz by topic."""
+        return await self.call(
+            "local_darimaa_get_quiz_topic_results",
+            channel=self.channel,
+            externalid=externalid,
+            cmid=cmid,
+        )
