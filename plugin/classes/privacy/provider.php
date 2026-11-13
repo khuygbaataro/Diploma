@@ -28,7 +28,8 @@ use core_privacy\local\request\writer;
  * Privacy provider for the Teacher & Student Assistant.
  *
  * The plugin stores which chat app account belongs to which user. Reminders are
- * stored by the Moodle messaging system and the event log.
+ * stored by the Moodle messaging system and the event log. The reports for teachers
+ * store nothing: they read course and quiz data and send it to the bot.
  *
  * @package    local_darimaa
  * @copyright  2026 Khuygbaatar Ochirkhuyag
@@ -62,6 +63,12 @@ class provider implements
             'isteacher' => 'privacy:metadata:bot:isteacher',
             'deadlines' => 'privacy:metadata:bot:deadlines',
             'missing' => 'privacy:metadata:bot:missing',
+            // The reports a linked teacher can ask for are about the students of their courses.
+            'courses' => 'privacy:metadata:bot:courses',
+            'studentcode' => 'privacy:metadata:bot:studentcode',
+            'fullname' => 'privacy:metadata:bot:fullname',
+            'courseactivity' => 'privacy:metadata:bot:courseactivity',
+            'quizmarks' => 'privacy:metadata:bot:quizmarks',
         ], 'privacy:metadata:bot');
 
         // What the bot passes on to the chat app when it answers.
@@ -69,6 +76,11 @@ class provider implements
             'firstname' => 'privacy:metadata:chatapps:firstname',
             'deadlines' => 'privacy:metadata:chatapps:deadlines',
             'missing' => 'privacy:metadata:chatapps:missing',
+            'courses' => 'privacy:metadata:chatapps:courses',
+            'studentcode' => 'privacy:metadata:chatapps:studentcode',
+            'fullname' => 'privacy:metadata:chatapps:fullname',
+            'courseactivity' => 'privacy:metadata:chatapps:courseactivity',
+            'quizmarks' => 'privacy:metadata:chatapps:quizmarks',
         ], 'privacy:metadata:chatapps');
 
         $collection->add_subsystem_link('core_message', [], 'privacy:metadata:coremessage');

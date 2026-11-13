@@ -24,6 +24,8 @@ use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use core_privacy\tests\provider_testcase;
+use local_darimaa\external\get_inactive_students;
+use local_darimaa\external\get_quiz_topic_results;
 use local_darimaa\external\get_user;
 use local_darimaa\external\link_account;
 use local_darimaa\local\link_manager;
@@ -72,12 +74,35 @@ final class provider_test extends provider_testcase {
         // What the web service functions give to the bot's server, and what the bot passes on to the chat app.
         $this->assertInstanceOf(external_location::class, $items['bot']);
         $botfields = array_keys($items['bot']->get_privacy_fields());
-        $this->assertEqualsCanonicalizing(['firstname', 'timezone', 'isteacher', 'deadlines', 'missing'], $botfields);
-        $this->assertInstanceOf(external_location::class, $items['chatapps']);
+        $teacherreports = ['courses', 'studentcode', 'fullname', 'courseactivity', 'quizmarks'];
         $this->assertEqualsCanonicalizing(
-            ['firstname', 'deadlines', 'missing'],
-            array_keys($items['chatapps']->get_privacy_fields())
+            array_merge(['firstname', 'timezone', 'isteacher', 'deadlines', 'missing'], $teacherreports),
+            $botfields
         );
+        $this->assertInstanceOf(external_location::class, $items['chatapps']);
+        $chatfields = array_keys($items['chatapps']->get_privacy_fields());
+        $this->assertEqualsCanonicalizing(array_merge(['firstname', 'deadlines', 'missing'], $teacherreports), $chatfields);
+
+        // Every field the teacher reports return about a student is declared, for the bot and for the chat app.
+        $declaredas = [
+            'code' => 'studentcode',
+            'fullname' => 'fullname',
+            'lastaccess' => 'courseactivity',
+            'dayssince' => 'courseactivity',
+            'minutes' => 'courseactivity',
+            'missing' => 'courseactivity',
+            'inactive' => 'courseactivity',
+            'percent' => 'quizmarks',
+            'ungraded' => 'quizmarks',
+            'topics' => 'quizmarks',
+        ];
+        foreach ([get_inactive_students::class, get_quiz_topic_results::class] as $function) {
+            foreach (array_keys($function::execute_returns()->keys['students']->content->keys) as $field) {
+                $this->assertArrayHasKey($field, $declaredas, $function);
+                $this->assertContains($declaredas[$field], $botfields, $field);
+                $this->assertContains($declaredas[$field], $chatfields, $field);
+            }
+        }
 
         // Every field about a person that the user functions return is declared for the bot.
         foreach ([get_user::class, link_account::class] as $function) {

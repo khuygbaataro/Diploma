@@ -74,8 +74,18 @@ The assistant bot's server gets data only about users who connected their chat a
 first name, the time zone, whether the user can send reminders, and the names, courses, due dates
 and links of the activities the user still has to do. Teachers also get their assignments with the
 number of students who have not submitted, without student names. The bot passes the first name,
-the activities and the teacher overview on to the chat app when it answers. It never gets a
-username, email address, ID number or user id.
+the activities and the teacher overview on to the chat app when it answers.
+
+A connected teacher can also ask for reports about the students of their own courses, whether or
+not those students use the bot: student code, full name, last course access, estimated time in the
+course, number of missing assignments, and quiz results by topic. The plugin stores none of this.
+It reads the data when the teacher asks and sends it to the bot, which shows it to the teacher in
+the chat app. Moodle permissions decide what a teacher may see, including separate groups and a
+hidden "last access" field.
+
+The student code comes from the field chosen in the plugin settings (username, ID number or a
+custom profile field). Apart from that field, the bot never gets a username, email address, ID
+number or user id.
 
 Reminders are delivered by the Moodle messaging system, which keeps its own records.
 
