@@ -3,9 +3,11 @@
 import hashlib
 import hmac
 import json
+import logging
 from urllib.parse import parse_qs
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from darimaa_bot.app import create_app
@@ -20,7 +22,7 @@ SETTINGS = Settings(
 )
 
 
-def make_client():
+def make_client(graph_status: int = 200):
     sent = []
     moodle_calls = []
 
@@ -33,8 +35,11 @@ def make_client():
                 return httpx.Response(200, json={"linked": False, "linkurl": "https://moodle.test/local/darimaa/link.php"})
             return httpx.Response(200, json={"exception": "x", "errorcode": "unexpected", "message": "unexpected"})
         if request.url.host == "graph.facebook.com":
-            assert request.url.params["access_token"] == "page-token"
+            assert request.headers["authorization"] == "Bearer page-token"
+            assert "access_token" not in request.url.params
             sent.append(json.loads(request.content))
+            if graph_status >= 400:
+                return httpx.Response(graph_status, json={"error": {"message": "refused"}})
             return httpx.Response(200, json={"message_id": "mid"})
         return httpx.Response(404)
 
@@ -76,3 +81,20 @@ def test_signed_message_gets_a_reply_and_unsigned_is_refused():
     assert sent[0]["recipient"] == {"id": "psid-1"}
     assert sent[0]["messaging_type"] == "RESPONSE"
     assert "local/darimaa/link.php" in sent[0]["message"]["text"]
+
+
+@pytest.mark.parametrize("graph_status", [200, 400])
+def test_tokens_never_reach_the_log(caplog, graph_status):
+    client, sent, _ = make_client(graph_status)
+    body = {"object": "page", "entry": [{"messaging": [
+        {"sender": {"id": "psid-1"}, "timestamp": 1, "message": {"mid": "m1", "text": "сайн уу"}},
+    ]}]}
+    raw, headers = signed(body)
+    with caplog.at_level(logging.DEBUG), client:
+        assert client.post("/webhook", content=raw, headers=headers).status_code == 200
+
+    # The request to Meta was made and logged, whether Meta accepted it or not.
+    assert sent
+    assert "graph.facebook.com" in caplog.text
+    for secret in ("page-token", "moodle-token", "app-secret"):
+        assert secret not in caplog.text

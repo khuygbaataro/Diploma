@@ -119,9 +119,10 @@ class MessengerClient:
         self.http = http
 
     async def _post(self, path: str, body: dict[str, Any]) -> None:
+        # The token goes in a header, never in the URL: request URLs end up in logs and error messages.
         response = await self.http.post(
             f"{self.base}/{path}",
-            params={"access_token": self.page_token},
+            headers={"Authorization": f"Bearer {self.page_token}"},
             json=body,
             timeout=30,
         )
