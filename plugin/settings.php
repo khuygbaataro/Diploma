@@ -44,5 +44,21 @@ if ($hassiteconfig) {
             '',
             PARAM_URL
         ));
+
+        $settings->add(new admin_setting_configselect(
+            'local_darimaa/studentcodefield',
+            new lang_string('studentcodefield', 'local_darimaa'),
+            new lang_string('studentcodefield_desc', 'local_darimaa'),
+            \local_darimaa\local\student_code::DEFAULT_FIELD,
+            \local_darimaa\local\student_code::get_choices()
+        ));
+
+        $settings->add(new admin_setting_configtext(
+            'local_darimaa/sessiontimeout',
+            new lang_string('sessiontimeout', 'local_darimaa'),
+            new lang_string('sessiontimeout_desc', 'local_darimaa'),
+            30,
+            PARAM_INT
+        ));
     }
 }
