@@ -13,7 +13,7 @@ import httpx
 
 from . import texts
 from .memory import RateLimiter, TTLSet
-from .messenger import Incoming, MessengerClient, Reply
+from .messenger import Incoming, MessengerClient, Reply, account_ref
 from .moodle import MoodleClient, MoodleError
 
 log = logging.getLogger(__name__)
@@ -95,14 +95,14 @@ class Bot:
         try:
             replies = await self.respond(event)
         except MoodleError as error:
-            log.warning("Moodle refused a request for %s: %s", event.sender_id, error)
+            log.warning("Moodle refused a request for account %s: %s", account_ref(event.sender_id), error)
             replies = [Reply(ERROR_TEXTS.get(error.errorcode, texts.ERROR))]
         except httpx.HTTPError as error:
             log.error("Could not reach Moodle: %s", error)
             replies = [Reply(texts.ERROR)]
         except Exception:
             # Anything else is a bug or an answer we did not expect. The user still gets a reply.
-            log.exception("Unexpected error while answering a message")
+            log.exception("Unexpected error while answering account %s", account_ref(event.sender_id))
             replies = [Reply(texts.ERROR)]
 
         for reply in replies:

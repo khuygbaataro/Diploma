@@ -25,6 +25,14 @@ def verify_signature(app_secret: str, body: bytes, header: str | None) -> bool:
     return hmac.compare_digest(expected, header[len("sha256="):])
 
 
+def account_ref(sender_id: str) -> str:
+    """A short hash of a Messenger account id, for logs. The id itself is never logged.
+
+    The same account always gets the same reference, so its log lines can still be followed.
+    """
+    return hashlib.sha256(sender_id.encode("utf-8")).hexdigest()[:12]
+
+
 @dataclass
 class Incoming:
     """One thing a person did in the chat."""

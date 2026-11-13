@@ -98,3 +98,5 @@ def test_tokens_never_reach_the_log(caplog, graph_status):
     assert "graph.facebook.com" in caplog.text
     for secret in ("page-token", "moodle-token", "app-secret"):
         assert secret not in caplog.text
+    # The Messenger account id stays out of the log too.
+    assert "psid-1" not in caplog.text

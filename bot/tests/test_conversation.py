@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -10,7 +11,8 @@ import pytest
 
 from darimaa_bot import texts
 from darimaa_bot.conversation import Bot, extract_code, intent
-from darimaa_bot.messenger import Incoming
+from darimaa_bot.messenger import Incoming, account_ref
+from darimaa_bot.moodle import MoodleError
 
 from .fakes import FakeMessenger, FakeMoodle
 
@@ -222,3 +224,29 @@ def test_unexpected_errors_are_logged_and_the_user_gets_an_answer(setup, caplog)
     # The bot keeps answering afterwards.
     run(bot.handle(tap("psid-a", "HELP", "k2")))
     assert messenger.last().text.startswith("Би ингэж тусалж чадна")
+
+
+def test_logs_show_a_short_hash_instead_of_the_messenger_id(setup, caplog):
+    bot, moodle, messenger = setup
+    sender = "24680135791357913"
+    moodle.links[sender] = 7
+
+    async def refused(*args, **kwargs):
+        raise MoodleError("unexpected", "refused")
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError("broken")
+
+    with caplog.at_level(logging.DEBUG):
+        moodle.get_deadlines = refused
+        run(bot.handle(tap(sender, "PLAN", "k1")))
+        moodle.get_deadlines = broken
+        run(bot.handle(tap(sender, "PLAN", "k2")))
+
+    assert len([record for record in caplog.records if record.name.startswith("darimaa_bot")]) == 2
+    assert sender not in caplog.text
+    assert caplog.text.count(account_ref(sender)) == 2
+
+    assert re.fullmatch(r"[0-9a-f]{12}", account_ref(sender))
+    assert account_ref(sender) == account_ref(sender)
+    assert account_ref(sender) != account_ref("24680135791357914")
