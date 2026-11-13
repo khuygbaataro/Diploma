@@ -9,7 +9,7 @@ from darimaa_bot import texts
 from darimaa_bot.conversation import Bot
 from darimaa_bot.messenger import Incoming
 
-from .fakes import FakeMessenger, FakeMoodle, course, inactive_student
+from .fakes import FakeMessenger, FakeMoodle, course, inactive_student, quiz, quiz_student
 
 NOW = 1790000000.0
 TEACHER = "psid-teacher"
@@ -133,5 +133,173 @@ def test_inactive_list_is_only_for_teachers_of_the_course(setup):
 
     # A teacher asking about a course they do not teach is refused by Moodle.
     run(bot.handle(tap(TEACHER, "INACTIVE_COURSE:99", "k2")))
+    assert messenger.last().text == texts.NO_PERMISSION
+    assert "Саруул" not in " ".join(messenger.texts())
+
+
+# Quiz results by topic.
+
+
+def biology_with_quizzes(moodle: FakeMoodle) -> None:
+    """One course with three quizzes. Nobody has finished the second quiz yet."""
+    moodle.courses[9] = [course(12, "Биологи 101", students=5, quizzes=[
+        quiz(345, "Сорил 1", finished=3),
+        quiz(346, "Сорил 2", finished=0),
+        quiz(347, "Эцсийн сорил", finished=2),
+    ])]
+    moodle.quiz_results[345] = {
+        "notattempted": 2,
+        "topics": [
+            {"name": "Эс", "maxmark": 10, "average": 71.5},
+            {"name": "Удамшил", "maxmark": 10, "average": 48.0},
+            {"name": "Экологи", "maxmark": 10, "average": 90.0},
+        ],
+        "students": [
+            quiz_student("B200910001", "Ану Мөнх", 60.0, {"Эс": 80, "Удамшил": 40, "Экологи": 60}),
+            quiz_student("B200910002", "Болд Ганзориг", 85.0, {"Эс": 90, "Удамшил": 75, "Экологи": 90}),
+            quiz_student("B200910003", "Саруул Тэмүүлэн", 41.7, {"Эс": 45, "Удамшил": 30, "Экологи": 50}),
+        ],
+    }
+
+
+def test_quiz_results_show_topics_weakest_first_and_students_with_weak_topics(setup, caplog):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+
+    with caplog.at_level(logging.DEBUG):
+        run(bot.handle(tap(TEACHER, "QUIZ_SHOW:345", "k1")))
+
+    assert messenger.last().text.split("\n") == [
+        "«Сорил 1» (Биологи 101): 3 оюутан өгсөн, 2 оюутан өгөөгүй.",
+        "",
+        "Сэдвүүд, хамгийн сулаас нь:",
+        "• Удамшил: дундаж 48%",
+        "• Эс: дундаж 71.5%",
+        "• Экологи: дундаж 90%",
+        "",
+        "60%-иас доош сэдэвтэй оюутнууд:",
+        "• B200910003 Саруул Тэмүүлэн: сорил 41.7%, шалгалтын ойролцоо оноо ≈12.5/30. "
+        "Сул сэдэв: Удамшил 30%, Эс 45%, Экологи 50%",
+        # 60 percent of 30 points. A topic at exactly 60 percent is not weak.
+        "• B200910001 Ану Мөнх: сорил 60%, шалгалтын ойролцоо оноо ≈18.0/30. Сул сэдэв: Удамшил 40%",
+        "",
+        "≈ тэмдэгтэй оноо нь сорилын хувиар бодсон ойролцоо тооцоо. Жинхэнэ шалгалтын оноо биш.",
+    ]
+    # Bold has no weak topic, so he is not listed.
+    assert "Болд" not in messenger.last().text
+    assert [recipient for recipient, _ in messenger.sent] == [TEACHER]
+    assert "send_reminders" not in moodle.calls
+    # Names, codes and marks of students stay out of the log.
+    for private in ("B2009", "Саруул", "Ану", "41.7", "18.0"):
+        assert private not in caplog.text
+
+
+def test_quiz_choice_offers_only_quizzes_with_finished_attempts(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+
+    run(bot.handle(tap(TEACHER, "QUIZ_COURSE:12", "k1")))
+
+    reply = messenger.last()
+    assert reply.text.split("\n") == [
+        "«Биологи 101» хичээлийн сорилууд:",
+        "1. Сорил 1: 3 оюутан өгсөн",
+        "2. Эцсийн сорил: 2 оюутан өгсөн",
+        "",
+        "Аль сорилын дүнг харах вэ?",
+    ]
+    assert reply.quick_replies == [("1. Сорил 1", "QUIZ_SHOW:345"), ("2. Эцсийн сорил", "QUIZ_SHOW:347"),
+                                   ("Болих", "CANCEL")]
+    assert "Сорил 2" not in reply.text
+    assert "get_quiz_topic_results" not in moodle.calls
+
+
+def test_quiz_choice_with_one_quiz_or_none(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+    moodle.courses[9].append(course(13, "Хими", quizzes=[quiz(400, "Хими 1", finished=0)]))
+    moodle.courses[9].append(course(14, "Физик", quizzes=[quiz(500, "Хөдөлгөөн", finished=4), quiz(501, "Хүч", finished=0)]))
+    moodle.quiz_results[500] = {"students": [quiz_student("B200910001", "Ану Мөнх", 90.0, {"Хурд": 90})]}
+
+    # No quiz with a finished attempt.
+    run(bot.handle(tap(TEACHER, "QUIZ_COURSE:13", "k1")))
+    assert messenger.last().text == "«Хими» хичээлд оюутан өгсөн сорил одоогоор алга."
+
+    # Only one such quiz: its results come at once, without a question.
+    run(bot.handle(tap(TEACHER, "QUIZ_COURSE:14", "k2")))
+    assert messenger.last().text.startswith("«Хөдөлгөөн» (Физик): 1 оюутан өгсөн, 0 оюутан өгөөгүй.")
+
+    # A course that is not in the teacher's list.
+    run(bot.handle(tap(TEACHER, "QUIZ_COURSE:99", "k3")))
+    assert messenger.last().text == texts.COURSE_GONE
+
+
+def test_quiz_results_without_weak_students_and_with_answers_that_wait_for_a_mark(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+    essay_waits = quiz_student("B200910002", "Болд Ганзориг", 85.0, {"Эс": 90, "Эсээ": 0}, ungraded=1)
+    essay_waits["topics"][1]["maxmark"] = 0
+    moodle.quiz_results[347] = {
+        "notattempted": 0,
+        "topics": [{"name": "Эс", "maxmark": 10, "average": 90.0}, {"name": "Эсээ", "maxmark": 10, "average": 0.0}],
+        "students": [essay_waits],
+    }
+
+    run(bot.handle(tap(TEACHER, "QUIZ_SHOW:347", "k1")))
+
+    lines = messenger.last().text.split("\n")
+    # The essay topic has no marked question yet, so it does not make the student weak.
+    assert "60%-иас доош сэдэвтэй оюутан алга." in lines
+    assert "Болд" not in messenger.last().text
+    assert "≈" not in messenger.last().text
+    assert lines[-1] == texts.QUIZ_UNGRADED_NOTE
+
+
+def test_quiz_results_stop_at_fifteen_students_and_follow_the_settings(setup):
+    _, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+    moodle.quiz_results[345] = {
+        "notattempted": 0,
+        "topics": [{"name": "Эс", "maxmark": 10, "average": 45.0}],
+        "students": [quiz_student(f"B2009100{number:02d}", f"Оюутан {number:02d}", 30.0 + number, {"Эс": 30 + number})
+                     for number in range(1, 21)],
+    }
+    bot = Bot(moodle, messenger, clock=lambda: NOW, weak_topic_below=48, exam_points=40)
+
+    run(bot.handle(tap(TEACHER, "QUIZ_SHOW:345", "k1")))
+
+    lines = messenger.last().text.split("\n")
+    # Students 1 to 17 are below 48 percent. The weakest come first.
+    assert "48%-иас доош сэдэвтэй оюутнууд:" in lines
+    listed = [line for line in lines if line.startswith("• B2009")]
+    assert len(listed) == 15
+    assert listed[0] == "• B200910001 Оюутан 01: сорил 31%, шалгалтын ойролцоо оноо ≈12.4/40. Сул сэдэв: Эс 31%"
+    assert listed[-1].startswith("• B200910015 Оюутан 15:")
+    assert "…бас 2 оюутан байна." in lines
+
+
+def test_quiz_results_when_nobody_attempted(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+
+    run(bot.handle(tap(TEACHER, "QUIZ_SHOW:346", "k1")))
+
+    assert messenger.last().text == "«Сорил 2» (Биологи 101): одоогоор нэг ч оюутан өгөөгүй байна."
+
+
+def test_quiz_results_are_only_for_teachers_of_the_course(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+
+    # A student who sends the payloads gets nothing, and Moodle is not asked for teacher data.
+    run(bot.handle(tap(STUDENT, "QUIZ_SHOW:345", "k1")))
+    assert messenger.last().text == texts.NO_PERMISSION
+    run(bot.handle(tap(STUDENT, "QUIZ_COURSE:12", "k2")))
+    assert messenger.last().text == texts.NO_PERMISSION
+    assert "get_quiz_topic_results" not in moodle.calls
+    assert "get_courses" not in moodle.calls
+
+    # A teacher asking about a quiz they may not see is refused by Moodle.
+    run(bot.handle(tap(TEACHER, "QUIZ_SHOW:999", "k3")))
     assert messenger.last().text == texts.NO_PERMISSION
     assert "Саруул" not in " ".join(messenger.texts())

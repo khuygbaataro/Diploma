@@ -73,6 +73,23 @@ INACTIVE_HOURS_NOTE = "≈ тэмдэгтэй цаг нь Moodle-ийн бүрт
 INACTIVE_EMPTY = "«{course}»: сүүлийн {days} хоногт бүх оюутан орж ирсэн байна."
 INACTIVE_HIDDEN = "Энэ сайт оюутны сүүлд орсон огноог нуудаг тул идэвхгүй оюутныг харуулах боломжгүй."
 
+COURSE_GONE = "Энэ хичээл таны жагсаалтад алга. Дахин сонгоно уу."
+QUIZ_PICK_HEADER = "«{course}» хичээлийн сорилууд:"
+QUIZ_PICK_LINE = "{n}. {name}: {finished} оюутан өгсөн"
+QUIZ_PICK = "Аль сорилын дүнг харах вэ?"
+QUIZ_NONE = "«{course}» хичээлд оюутан өгсөн сорил одоогоор алга."
+QUIZ_HEADER = "«{quiz}» ({course}): {attempted} оюутан өгсөн, {notattempted} оюутан өгөөгүй."
+QUIZ_NO_ATTEMPTS = "«{quiz}» ({course}): одоогоор нэг ч оюутан өгөөгүй байна."
+QUIZ_TOPICS_HEADER = "Сэдвүүд, хамгийн сулаас нь:"
+QUIZ_TOPIC_LINE = "• {name}: дундаж {average}%"
+QUIZ_WEAK_HEADER = "{threshold}%-иас доош сэдэвтэй оюутнууд:"
+QUIZ_WEAK_LINE = "• {student}: сорил {percent}%, шалгалтын ойролцоо оноо ≈{estimate}/{points}. Сул сэдэв: {topics}"
+QUIZ_WEAK_TOPIC = "{name} {percent}%"
+QUIZ_NO_WEAK = "{threshold}%-иас доош сэдэвтэй оюутан алга."
+QUIZ_MORE = "…бас {count} оюутан байна."
+QUIZ_ESTIMATE_NOTE = "≈ тэмдэгтэй оноо нь сорилын хувиар бодсон ойролцоо тооцоо. Жинхэнэ шалгалтын оноо биш."
+QUIZ_UNGRADED_NOTE = "Зарим хариултыг багш хараахан дүгнээгүй байна. Дүгнэсний дараа хувь өөрчлөгдөж магадгүй."
+
 UNLINK_CONFIRM = "Messenger-ээ Moodle данснаас салгах уу? Дараа нь дахин холбож болно."
 UNLINK_DONE = "Салгалаа. Дахин холбох бол Moodle-ээс шинэ код аваарай."
 

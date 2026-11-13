@@ -34,7 +34,13 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
         async with httpx.AsyncClient(transport=transport) as http:
             moodle = MoodleClient(settings.moodle_url, settings.moodle_token, settings.channel, http)
             messenger = MessengerClient(settings.graph_url, settings.graph_version, settings.page_access_token, http)
-            state["bot"] = Bot(moodle, messenger, settings.default_timezone)
+            state["bot"] = Bot(
+                moodle,
+                messenger,
+                settings.default_timezone,
+                weak_topic_below=settings.weak_topic_below,
+                exam_points=settings.exam_points,
+            )
             log.info("Teacher & Student Assistant bot started for %s", settings.moodle_url)
             yield
         state.clear()

@@ -35,6 +35,8 @@ class Settings:
     graph_version: str = "v23.0"
     default_timezone: str = "Asia/Ulaanbaatar"
     channel: str = "messenger"
+    weak_topic_below: float = 60.0  # percent: a quiz topic below this counts as weak
+    exam_points: float = 30.0  # points of the final exam, for the exam estimate
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "Settings":
@@ -48,6 +50,18 @@ class Settings:
                 raise RuntimeError(f"{name} is not set. See .env.example.")
             return value
 
+        def number(name: str, default: float, highest: float) -> float:
+            raw = merged.get(name, "").strip()
+            if not raw:
+                return default
+            try:
+                value = float(raw)
+            except ValueError:
+                value = -1.0
+            if not 0 < value <= highest:
+                raise RuntimeError(f"{name} must be a number above 0 and at most {highest:g}. See .env.example.")
+            return value
+
         return cls(
             moodle_url=need("MOODLE_URL").rstrip("/"),
             moodle_token=need("MOODLE_TOKEN"),
@@ -57,4 +71,6 @@ class Settings:
             graph_url=merged.get("FB_GRAPH_URL", cls.graph_url).rstrip("/") or cls.graph_url,
             graph_version=merged.get("FB_GRAPH_VERSION", cls.graph_version) or cls.graph_version,
             default_timezone=merged.get("BOT_TIMEZONE", cls.default_timezone) or cls.default_timezone,
+            weak_topic_below=number("WEAK_TOPIC_BELOW", cls.weak_topic_below, 100),
+            exam_points=number("EXAM_POINTS", cls.exam_points, 1000),
         )

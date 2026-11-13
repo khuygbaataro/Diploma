@@ -23,6 +23,7 @@ CODE_PATTERN = re.compile(r"(?<![A-Za-z0-9])([A-Za-z0-9]{4})[-\s]?([A-Za-z0-9]{4
 MAX_ITEMS = 8
 MAX_ASSIGNMENTS = 10
 MAX_STUDENTS = 15
+MAX_CHOICES = 10
 INACTIVE_DAYS = 7
 
 # Checked in this order. Short words must match as whole words, longer ones anywhere.
@@ -81,11 +82,15 @@ class Bot:
         messenger: MessengerClient,
         default_timezone: str = "Asia/Ulaanbaatar",
         clock: Callable[[], float] = time.time,
+        weak_topic_below: float = 60.0,
+        exam_points: float = 30.0,
     ) -> None:
         self.moodle = moodle
         self.messenger = messenger
         self.default_timezone = default_timezone
         self.clock = clock
+        self.weak_topic_below = weak_topic_below
+        self.exam_points = exam_points
         self.handled = TTLSet(ttl=3600)
         self.code_attempts = RateLimiter(limit=5, window=3600)
         self.recent_sends = TTLSet(ttl=600)
@@ -150,6 +155,10 @@ class Bot:
             return await self.send(sender, user, int(argument))
         if name == "INACTIVE_COURSE" and argument.isdigit():
             return await self.inactive(sender, user, int(argument))
+        if name == "QUIZ_COURSE" and argument.isdigit():
+            return await self.choose_quiz(sender, user, int(argument))
+        if name == "QUIZ_SHOW" and argument.isdigit():
+            return await self.quiz_results(sender, user, int(argument))
         if name == "UNLINK":
             return [Reply(texts.UNLINK_CONFIRM, buttons=[(texts.YES_UNLINK, "UNLINK_YES"), (texts.NO, "CANCEL")])]
         if name == "UNLINK_YES":
@@ -288,6 +297,86 @@ class Bot:
         if with_hours:
             lines += ["", texts.INACTIVE_HOURS_NOTE]
         return [Reply("\n".join(lines), self.menu(user))]
+
+    async def choose_quiz(self, sender: str, user: dict[str, Any], courseid: int) -> list[Reply]:
+        """Lets a teacher pick a quiz of a course. Only quizzes that students have finished are offered."""
+        if not user.get("isteacher"):
+            return [Reply(texts.NO_PERMISSION, self.menu(user))]
+        courses = (await self.moodle.get_courses(sender)).get("courses", [])
+        course = next((row for row in courses if int(row["id"]) == courseid), None)
+        if not course:
+            return [Reply(texts.COURSE_GONE, self.menu(user))]
+
+        quizzes = [quiz for quiz in course.get("quizzes", []) if int(quiz.get("finished", 0)) > 0]
+        if not quizzes:
+            return [Reply(texts.QUIZ_NONE.format(course=course["fullname"]), self.menu(user))]
+        if len(quizzes) == 1:
+            return await self.quiz_results(sender, user, int(quizzes[0]["cmid"]))
+
+        lines = [texts.QUIZ_PICK_HEADER.format(course=course["fullname"])]
+        choices: list[tuple[str, str]] = []
+        for number, quiz in enumerate(quizzes[:MAX_CHOICES], start=1):
+            lines.append(texts.QUIZ_PICK_LINE.format(n=number, name=quiz["name"], finished=quiz["finished"]))
+            choices.append((f"{number}. {quiz['name']}", f"QUIZ_SHOW:{quiz['cmid']}"))
+        lines += ["", texts.QUIZ_PICK]
+        return [Reply("\n".join(lines), choices + [(texts.NO, "CANCEL")])]
+
+    async def quiz_results(self, sender: str, user: dict[str, Any], cmid: int) -> list[Reply]:
+        """Shows a teacher the results of one quiz by topic. Nothing is sent to the students."""
+        if not user.get("isteacher"):
+            return [Reply(texts.NO_PERMISSION, self.menu(user))]
+        data = await self.moodle.get_quiz_topic_results(sender, cmid)
+        if not data.get("linked"):
+            return [Reply(texts.not_linked(user.get("linkurl", "")))]
+
+        names = {"quiz": data.get("quizname", ""), "course": data.get("coursename", "")}
+        students = data.get("students", [])
+        if not students:
+            return [Reply(texts.QUIZ_NO_ATTEMPTS.format(**names), self.menu(user))]
+
+        lines = [texts.QUIZ_HEADER.format(attempted=len(students), notattempted=data.get("notattempted", 0), **names)]
+
+        topics = sorted(data.get("topics", []), key=lambda topic: (float(topic["average"]), topic["name"]))
+        if topics:
+            lines += ["", texts.QUIZ_TOPICS_HEADER]
+            lines += [texts.QUIZ_TOPIC_LINE.format(name=topic["name"], average=self.number(topic["average"]))
+                      for topic in topics]
+
+        # A topic counts as weak only when it has marked questions: an essay that waits for a mark is not weak.
+        weak: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
+        for student in students:
+            low = [topic for topic in student.get("topics", [])
+                   if float(topic.get("maxmark", 0)) > 0 and float(topic["percent"]) < self.weak_topic_below]
+            if low:
+                weak.append((student, sorted(low, key=lambda topic: (float(topic["percent"]), topic["name"]))))
+        weak.sort(key=lambda pair: (float(pair[0]["percent"]), str(pair[0].get("fullname", ""))))
+
+        threshold = self.number(self.weak_topic_below)
+        lines.append("")
+        if not weak:
+            lines.append(texts.QUIZ_NO_WEAK.format(threshold=threshold))
+        else:
+            lines.append(texts.QUIZ_WEAK_HEADER.format(threshold=threshold))
+            for student, low in weak[:MAX_STUDENTS]:
+                lines.append(texts.QUIZ_WEAK_LINE.format(
+                    student=self.student_label(student),
+                    percent=self.number(student["percent"]),
+                    estimate=f"{float(student['percent']) * self.exam_points / 100:.1f}",
+                    points=self.number(self.exam_points),
+                    topics=", ".join(texts.QUIZ_WEAK_TOPIC.format(name=topic["name"], percent=self.number(topic["percent"]))
+                                     for topic in low),
+                ))
+            if len(weak) > MAX_STUDENTS:
+                lines.append(texts.QUIZ_MORE.format(count=len(weak) - MAX_STUDENTS))
+            lines += ["", texts.QUIZ_ESTIMATE_NOTE]
+        if any(int(student.get("ungraded", 0)) > 0 for student in students):
+            lines.append(texts.QUIZ_UNGRADED_NOTE)
+        return [Reply("\n".join(lines), self.menu(user))]
+
+    @staticmethod
+    def number(value: Any) -> str:
+        """A number without a needless ".0": 70.0 becomes 70, 71.5 stays 71.5."""
+        return f"{float(value):g}"
 
     @staticmethod
     def student_label(student: dict[str, Any]) -> str:
