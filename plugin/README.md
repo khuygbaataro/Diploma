@@ -86,10 +86,11 @@ Reminders are delivered by the Moodle messaging system, which keeps its own reco
 vendor/bin/phpunit --testsuite local_darimaa_testsuite
 
 # Coding style
-phpcs --standard=moodle local/darimaa
+phpcs --standard=moodle-extra --extensions=php local/darimaa
 ```
 
-GitHub Actions runs the full Moodle plugin checks on every push (`.github/workflows/moodle-ci.yml`).
+GitHub Actions runs the full Moodle plugin checks, with the `moodle-extra` coding standard, on every
+push that changes the plugin (`.github/workflows/plugin-ci.yml` in the repository root).
 
 ## Roadmap
 
