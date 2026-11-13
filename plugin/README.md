@@ -26,6 +26,10 @@ functions. The technical name of the plugin is `local_darimaa`.
 - **Web service functions for the bot** (0.2): a student's open work from the calendar, a teacher's
   assignments with missing submissions, and sending reminders in the teacher's name. The bot only
   gets data for accounts their owners have linked.
+- **Reports for teachers** (0.3): three read-only web service functions for the bot. A linked
+  teacher can get their courses and quizzes, the inactive students of a course, and the results of
+  a quiz by topic. They send no messages and change nothing in Moodle. See
+  [Web service functions](#web-service-functions).
 
 ## Requirements
 
@@ -52,6 +56,11 @@ functions. The technical name of the plugin is `local_darimaa`.
 
 - **Default reminder message**: the text teachers start from. The bot sends this text as it is.
 - **Messenger link**: the `m.me` link of the bot's Facebook Page, used for the "Open Messenger" button.
+- **Student code field** (0.3): the user field that holds the student code teachers know a student
+  by. Choices: username (default), ID number, or any custom profile field. The reports for
+  teachers show this code next to the student's name.
+- **Session timeout (minutes)** (0.3): default 30. Used to estimate the time a student spent in a
+  course: the pause between two actions of a student counts only when it is shorter than this.
 
 ## Setting up the Messenger bot
 
@@ -64,6 +73,132 @@ sudo -u www-data php local/darimaa/cli/setup_bot.php --iprestriction=SERVER_IP
 It turns on web services and the REST protocol, creates a `darimaabot` service account with a role
 that can only call the assistant's functions, and prints the `MOODLE_URL` and `MOODLE_TOKEN` lines for
 the bot's settings. Running it again reuses what exists; `--newtoken` replaces the token.
+
+## Web service functions
+
+The service "Darimaa bot" (`local_darimaa_bot`) has nine functions. All of them need the bot's
+token and the capability `local/darimaa:botaccess`, and all take `channel` (for example
+`messenger`) and `externalid` (the account id the chat app gave the user). Permissions are always
+checked for the Moodle user linked to that chat account, never for the bot's own account. When
+the chat account is not linked, the reply has `linked: false` and no data.
+
+| Function | Type | What it does |
+| --- | --- | --- |
+| `local_darimaa_get_user` | read | The linked user's first name, time zone and whether they teach |
+| `local_darimaa_link_account` | write | Links a chat account with a one-time code |
+| `local_darimaa_unlink_account` | write | Removes the link |
+| `local_darimaa_get_deadlines` | read | A student's open work, by due date |
+| `local_darimaa_get_missing` | read | A teacher's assignments with missing submissions |
+| `local_darimaa_send_reminders` | write | Sends reminders in the teacher's name |
+| `local_darimaa_get_courses` | read | (0.3) A teacher's courses and quizzes |
+| `local_darimaa_get_inactive_students` | read | (0.3) Last access, time spent and missing work of each student |
+| `local_darimaa_get_quiz_topic_results` | read | (0.3) Quiz results by topic |
+
+The examples below use placeholders: put your own site address in place of `moodle.example.com`,
+the bot's token in place of `BOT-TOKEN`, and a linked teacher's chat account id in place of
+`CHAT-ACCOUNT-ID`.
+
+### local_darimaa_get_courses
+
+Courses where the linked user has `local/darimaa:sendreminders`, with the visible quizzes where
+the user has `mod/quiz:viewreports`.
+
+```bash
+curl -s https://moodle.example.com/webservice/rest/server.php \
+  -d wstoken=BOT-TOKEN -d moodlewsrestformat=json \
+  -d wsfunction=local_darimaa_get_courses \
+  -d channel=messenger -d externalid=CHAT-ACCOUNT-ID
+```
+
+```json
+{
+  "linked": true,
+  "courses": [
+    {
+      "id": 12, "fullname": "Biology 101", "shortname": "BIO101", "students": 48,
+      "quizzes": [{"cmid": 345, "name": "Cells", "timeclose": 1794000000, "finished": 41}]
+    }
+  ]
+}
+```
+
+`students` counts users with an active enrolment and a gradebook role. `finished` is the number
+of those students with a finished attempt. `timeclose` is 0 when the quiz does not close.
+
+### local_darimaa_get_inactive_students
+
+Parameters: `courseid`, and `days` (default 7, from 1 to 365). The linked user needs
+`moodle/course:viewparticipants` and `local/darimaa:sendreminders` in the course.
+
+```bash
+curl -s https://moodle.example.com/webservice/rest/server.php \
+  -d wstoken=BOT-TOKEN -d moodlewsrestformat=json \
+  -d wsfunction=local_darimaa_get_inactive_students \
+  -d channel=messenger -d externalid=CHAT-ACCOUNT-ID \
+  -d courseid=12 -d days=7
+```
+
+```json
+{
+  "linked": true, "coursename": "Biology 101", "days": 7,
+  "lastaccessavailable": true, "timeavailable": true,
+  "students": [
+    {"code": "B200910003", "fullname": "Saraa Tsetseg", "lastaccess": 0, "dayssince": -1,
+     "minutes": 0, "missing": 2, "inactive": true},
+    {"code": "B200910001", "fullname": "Anu Dorj", "lastaccess": 1793900000, "dayssince": 0,
+     "minutes": 95, "missing": 0, "inactive": false}
+  ]
+}
+```
+
+- Inactive students come first: those who never opened the course, then the longest away.
+- `minutes` is an estimate from the standard log since the course start date. It adds the pauses
+  between a student's own actions that are shorter than the session timeout. When the standard
+  log store is off, `timeavailable` is false and `minutes` is -1.
+- `missing` counts assignments past their due date that the student has not submitted.
+  Assignments with anonymous submissions are left out, and so is a student whose extension or
+  user override is still running.
+- When the site hides the "last access" field and the teacher may not see hidden user fields,
+  `lastaccessavailable` is false, `lastaccess` is 0, `dayssince` is -1 and nobody is `inactive`.
+- In separate groups mode a teacher without access to all groups gets only the students of
+  their own groups.
+
+### local_darimaa_get_quiz_topic_results
+
+Parameter: `cmid`, the course module id of the quiz. The linked user needs `mod/quiz:viewreports`
+on the quiz.
+
+```bash
+curl -s https://moodle.example.com/webservice/rest/server.php \
+  -d wstoken=BOT-TOKEN -d moodlewsrestformat=json \
+  -d wsfunction=local_darimaa_get_quiz_topic_results \
+  -d channel=messenger -d externalid=CHAT-ACCOUNT-ID \
+  -d cmid=345
+```
+
+```json
+{
+  "linked": true, "quizname": "Cells", "coursename": "Biology 101",
+  "topicsource": "categories", "notattempted": 7,
+  "topics": [{"name": "Cell structure", "maxmark": 6, "average": 71.5}],
+  "students": [
+    {"code": "B200910001", "fullname": "Anu Dorj", "percent": 83.3, "ungraded": 1,
+     "topics": [{"name": "Cell structure", "mark": 5, "maxmark": 6, "percent": 83.3}]}
+  ]
+}
+```
+
+- For each student the finished attempt with the highest mark is used, counting the questions
+  that are already marked. `students` lists only
+  students with a finished attempt; `notattempted` counts the others.
+- A topic is a quiz grade item when the quiz has grade items (`topicsource` is `gradeitems`).
+  Otherwise it is the question category of the question the student was really asked
+  (`categories`), so random questions are counted in the right category.
+- `ungraded` counts answers that wait for manual grading. They are left out of the student's
+  marks and maximums until a teacher has marked them.
+- In a topic of `topics`, `maxmark` is the full size of the topic and `average` is the average
+  percentage of the students who attempted.
+- The quiz's separate groups mode is respected in the same way as for inactive students.
 
 ## Privacy
 
