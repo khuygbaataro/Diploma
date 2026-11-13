@@ -1,0 +1,23 @@
+# Secrets: never commit real tokens, keys or passwords
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local databases and build output
+*.sqlite
+*.sqlite3
+*.db
+*.zip
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
