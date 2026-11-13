@@ -138,7 +138,7 @@ final class bot_functions_test extends \advanced_testcase {
 
         $result = $this->call(get_user::class, ['messenger', 'psid-1']);
         $this->assertTrue($result['linked']);
-        $this->assertEquals($students[0]->id, $result['userid']);
+        $this->assertSame('Anu', $result['firstname']);
         $this->assertFalse($result['isteacher']);
 
         $this->link($teacher, 'psid-2');
@@ -146,6 +146,31 @@ final class bot_functions_test extends \advanced_testcase {
 
         $this->assertTrue($this->call(unlink_account::class, ['messenger', 'psid-1'])['unlinked']);
         $this->assertFalse($this->call(get_user::class, ['messenger', 'psid-1'])['linked']);
+    }
+
+    /**
+     * The bot gets only the fields it reads: nothing that identifies the user beyond a first name.
+     */
+    public function test_get_user_returns_only_what_the_bot_needs(): void {
+        $this->resetAfterTest();
+        $student = $this->getDataGenerator()->create_user(['firstname' => 'Anu', 'lastname' => 'Tsetseg']);
+        $this->link($student, 'psid-1');
+        $this->act_as_bot();
+
+        $expected = ['linked', 'firstname', 'timezone', 'isteacher', 'linkurl'];
+        $this->assertSame($expected, array_keys(get_user::execute_returns()->keys));
+
+        foreach (['psid-1', 'psid-404'] as $externalid) {
+            $this->assertSame($expected, array_keys(get_user::execute('messenger', $externalid)));
+            $this->assertSame($expected, array_keys($this->call(get_user::class, ['messenger', $externalid])));
+        }
+
+        $reply = get_user::execute('messenger', 'psid-1');
+        $this->assertSame('Anu', $reply['firstname']);
+        $text = json_encode($reply);
+        foreach ([$student->lastname, $student->username, $student->email] as $private) {
+            $this->assertStringNotContainsString($private, $text);
+        }
     }
 
     /**

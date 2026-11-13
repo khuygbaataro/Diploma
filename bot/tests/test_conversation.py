@@ -170,3 +170,15 @@ def test_moodle_errors_become_friendly_messages(setup):
     moodle.get_deadlines = broken
     run(bot.handle(tap("psid-a", "PLAN", "k1")))
     assert "алдаа гарлаа" in messenger.last().text
+
+
+def test_get_user_fake_matches_the_fields_the_bot_reads(setup):
+    bot, moodle, messenger = setup
+    moodle.links["psid-a"] = 7
+    for sender in ("psid-a", "psid-unknown"):
+        user = run(moodle.get_user(sender))
+        assert list(user) == ["linked", "firstname", "timezone", "isteacher", "linkurl"]
+
+    # The bot answers a linked user from these fields alone.
+    run(bot.handle(tap("psid-a", "GET_STARTED", "k1")))
+    assert "Сайн байна уу, Anu!" in messenger.last().text

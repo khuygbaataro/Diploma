@@ -29,11 +29,10 @@ class FakeMoodle:
         self.calls.append("get_user")
         userid = self.links.get(externalid)
         if not userid:
-            return {"linked": False, "userid": 0, "firstname": "", "isteacher": False,
-                    "timezone": "", "linkurl": self.LINKURL}
+            return {"linked": False, "firstname": "", "timezone": "", "isteacher": False, "linkurl": self.LINKURL}
         user = self.users[userid]
-        return {"linked": True, "userid": userid, "firstname": user["firstname"], "isteacher": user["isteacher"],
-                "timezone": "Asia/Ulaanbaatar", "linkurl": self.LINKURL}
+        return {"linked": True, "firstname": user["firstname"], "timezone": "Asia/Ulaanbaatar",
+                "isteacher": user["isteacher"], "linkurl": self.LINKURL}
 
     async def link_account(self, externalid: str, code: str) -> dict[str, Any]:
         self.calls.append("link_account")

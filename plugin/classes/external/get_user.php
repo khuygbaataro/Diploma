@@ -55,12 +55,10 @@ class get_user extends bot_function {
         ]);
         self::require_bot($channel);
 
+        // Only what the bot needs to answer: no user id, full name, username or email.
         $result = [
             'linked' => false,
-            'userid' => 0,
             'firstname' => '',
-            'fullname' => '',
-            'lang' => '',
             'timezone' => '',
             'isteacher' => false,
             'linkurl' => (new \core\url('/local/darimaa/link.php'))->out(false),
@@ -69,10 +67,7 @@ class get_user extends bot_function {
         $user = link_manager::get_user($channel, $externalid);
         if ($user) {
             $result['linked'] = true;
-            $result['userid'] = (int) $user->id;
             $result['firstname'] = $user->firstname;
-            $result['fullname'] = fullname($user);
-            $result['lang'] = $user->lang;
             $result['timezone'] = \core_date::get_user_timezone($user);
             $result['isteacher'] = self::is_teacher($user);
         }
@@ -87,10 +82,7 @@ class get_user extends bot_function {
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'linked' => new external_value(PARAM_BOOL, 'Whether the chat account is linked to an active user'),
-            'userid' => new external_value(PARAM_INT, 'The linked user, or 0'),
             'firstname' => new external_value(PARAM_TEXT, 'The user\'s first name'),
-            'fullname' => new external_value(PARAM_TEXT, 'The user\'s full name'),
-            'lang' => new external_value(PARAM_ALPHANUMEXT, 'The user\'s language code'),
             'timezone' => new external_value(PARAM_TIMEZONE, 'The user\'s time zone'),
             'isteacher' => new external_value(PARAM_BOOL, 'Whether the user can send reminders in a course'),
             'linkurl' => new external_value(PARAM_URL, 'The Moodle page where users get a link code'),
