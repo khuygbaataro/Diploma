@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/darimaa/db" VERSION="20261106" COMMENT="XMLDB file for Moodle local/darimaa"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_darimaa_links" COMMENT="Links between Moodle users and their chat app accounts, such as Messenger">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The Moodle user"/>
+        <FIELD NAME="channel" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="The chat app, for example messenger"/>
+        <FIELD NAME="externalid" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="The account id in the chat app, empty until the user confirms the link"/>
+        <FIELD NAME="code" TYPE="char" LENGTH="16" NOTNULL="false" SEQUENCE="false" COMMENT="One-time code the user sends to the bot to confirm the link"/>
+        <FIELD NAME="codeexpires" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When the code stops working"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid-channel" UNIQUE="true" FIELDS="userid, channel"/>
+        <INDEX NAME="channel-externalid" UNIQUE="false" FIELDS="channel, externalid"/>
+        <INDEX NAME="code" UNIQUE="false" FIELDS="code"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
