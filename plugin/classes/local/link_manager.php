@@ -217,6 +217,17 @@ class link_manager {
     }
 
     /**
+     * Removes every link and code of a user, in all chat apps.
+     *
+     * @param int $userid The user.
+     */
+    public static function unlink_all(int $userid): void {
+        global $DB;
+
+        $DB->delete_records(self::TABLE, ['userid' => $userid]);
+    }
+
+    /**
      * Generates a code that no other user holds right now.
      *
      * Every code mixes letters and digits, so the bot can tell a code from an ordinary word.

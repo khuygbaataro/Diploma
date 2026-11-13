@@ -104,6 +104,25 @@ final class link_manager_test extends \advanced_testcase {
     }
 
     /**
+     * Removing everything of one user leaves other users alone.
+     */
+    public function test_unlink_all_removes_links_and_codes_of_one_user(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $user = $this->getDataGenerator()->create_user();
+        $other = $this->getDataGenerator()->create_user();
+
+        link_manager::link('messenger', link_manager::create_code($user->id, 'messenger'), 'psid-1');
+        link_manager::create_code($user->id, 'telegram');
+        link_manager::link('messenger', link_manager::create_code($other->id, 'messenger'), 'psid-2');
+
+        link_manager::unlink_all($user->id);
+
+        $this->assertFalse($DB->record_exists('local_darimaa_links', ['userid' => $user->id]));
+        $this->assertEquals($other->id, link_manager::get_user('messenger', 'psid-2')->id);
+    }
+
+    /**
      * Unknown chat apps are refused.
      */
     public function test_unknown_channel(): void {
