@@ -303,3 +303,83 @@ def test_quiz_results_are_only_for_teachers_of_the_course(setup):
     run(bot.handle(tap(TEACHER, "QUIZ_SHOW:999", "k3")))
     assert messenger.last().text == texts.NO_PERMISSION
     assert "Саруул" not in " ".join(messenger.texts())
+
+
+# Choosing the course.
+
+
+def test_teacher_without_a_course_is_told_so(setup):
+    bot, moodle, messenger = setup
+    moodle.courses[9] = []
+
+    for number, report in enumerate(("INACTIVE", "QUIZ")):
+        run(bot.handle(tap(TEACHER, report, f"k{number}")))
+        assert messenger.last().text == "Moodle дээр таны заадаг хичээл олдсонгүй."
+    assert "get_inactive_students" not in moodle.calls
+    assert "get_quiz_topic_results" not in moodle.calls
+
+
+def test_teacher_with_one_course_is_not_asked_which_course(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+    moodle.inactive[12] = {"students": [inactive_student("B200910003", "Саруул Тэмүүлэн", dayssince=-1)]}
+
+    run(bot.handle(tap(TEACHER, "INACTIVE", "k1")))
+    assert messenger.last().text.startswith("«Биологи 101»: идэвхгүй 1 оюутан")
+    assert len(messenger.sent) == 1
+
+    # The quiz report goes straight to the choice of a quiz.
+    run(bot.handle(tap(TEACHER, "QUIZ", "k2")))
+    assert messenger.last().text.startswith("«Биологи 101» хичээлийн сорилууд:")
+    assert len(messenger.sent) == 2
+
+
+def test_teacher_with_several_courses_picks_one(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+    moodle.courses[9].append(course(13, "Хими", students=31))
+
+    run(bot.handle(tap(TEACHER, "INACTIVE", "k1")))
+    reply = messenger.last()
+    assert reply.text.split("\n") == [
+        "Таны хичээлүүд:",
+        "1. Биологи 101 (5 оюутан)",
+        "2. Хими (31 оюутан)",
+        "",
+        "Аль хичээлийг харах вэ?",
+    ]
+    assert reply.quick_replies == [("1. Биологи 101", "INACTIVE_COURSE:12"), ("2. Хими", "INACTIVE_COURSE:13"),
+                                   ("Болих", "CANCEL")]
+    assert "get_inactive_students" not in moodle.calls
+
+    # The same list leads to the quiz report when that was asked for.
+    run(bot.handle(tap(TEACHER, "QUIZ", "k2")))
+    assert [payload for _, payload in messenger.last().quick_replies] == ["QUIZ_COURSE:12", "QUIZ_COURSE:13", "CANCEL"]
+
+    # Tapping a course continues the report.
+    run(bot.handle(tap(TEACHER, "INACTIVE_COURSE:13", "k3")))
+    assert messenger.last().text == "«Хими»: сүүлийн 7 хоногт бүх оюутан орж ирсэн байна."
+
+
+def test_long_course_list_shows_ten_courses(setup):
+    bot, moodle, messenger = setup
+    moodle.courses[9] = [course(100 + number, f"Хичээл {number:02d}") for number in range(1, 13)]
+
+    run(bot.handle(tap(TEACHER, "QUIZ", "k1")))
+
+    reply = messenger.last()
+    assert "10. Хичээл 10 (0 оюутан)" in reply.text
+    assert "Хичээл 11" not in reply.text
+    assert "…бас 2 хичээл байна." in reply.text
+    assert len(reply.quick_replies) == 11
+
+
+def test_student_who_taps_a_report_gets_their_own_plan(setup):
+    bot, moodle, messenger = setup
+    biology_with_quizzes(moodle)
+
+    for number, report in enumerate(("INACTIVE", "QUIZ")):
+        run(bot.handle(tap(STUDENT, report, f"k{number}")))
+        assert messenger.last().text.startswith("Ойрын 7 хоногт хийх ажил алга")
+    assert "get_courses" not in moodle.calls
+    assert moodle.calls.count("get_deadlines") == 2

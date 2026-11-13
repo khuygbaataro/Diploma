@@ -73,6 +73,11 @@ INACTIVE_HOURS_NOTE = "≈ тэмдэгтэй цаг нь Moodle-ийн бүрт
 INACTIVE_EMPTY = "«{course}»: сүүлийн {days} хоногт бүх оюутан орж ирсэн байна."
 INACTIVE_HIDDEN = "Энэ сайт оюутны сүүлд орсон огноог нуудаг тул идэвхгүй оюутныг харуулах боломжгүй."
 
+COURSES_NONE = "Moodle дээр таны заадаг хичээл олдсонгүй."
+COURSE_PICK_HEADER = "Таны хичээлүүд:"
+COURSE_PICK_LINE = "{n}. {name} ({students} оюутан)"
+COURSE_PICK = "Аль хичээлийг харах вэ?"
+COURSE_MORE = "…бас {count} хичээл байна."
 COURSE_GONE = "Энэ хичээл таны жагсаалтад алга. Дахин сонгоно уу."
 QUIZ_PICK_HEADER = "«{course}» хичээлийн сорилууд:"
 QUIZ_PICK_LINE = "{n}. {name}: {finished} оюутан өгсөн"

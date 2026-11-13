@@ -26,6 +26,9 @@ MAX_STUDENTS = 15
 MAX_CHOICES = 10
 INACTIVE_DAYS = 7
 
+# The teacher reports start with a course. Each one continues with this payload plus the course id.
+COURSE_STEPS = {"INACTIVE": "INACTIVE_COURSE", "QUIZ": "QUIZ_COURSE"}
+
 # Checked in this order. Short words must match as whole words, longer ones anywhere.
 KEYWORDS: list[tuple[str, list[str]]] = [
     ("UNLINK", ["салгах", "салга", "salgah", "unlink"]),
@@ -153,6 +156,11 @@ class Bot:
             return await self.confirm_send(sender, user, int(argument))
         if name == "SEND" and argument.isdigit():
             return await self.send(sender, user, int(argument))
+        if name in COURSE_STEPS:
+            # The reports are for teachers. Anybody else gets their own plan, as for "PLAN".
+            if not user.get("isteacher"):
+                return await self.plan(sender, user)
+            return await self.choose_course(sender, user, name)
         if name == "INACTIVE_COURSE" and argument.isdigit():
             return await self.inactive(sender, user, int(argument))
         if name == "QUIZ_COURSE" and argument.isdigit():
@@ -264,6 +272,27 @@ class Bot:
         if not result.get("sent"):
             return [Reply(texts.SEND_NONE, self.menu(user))]
         return [Reply(texts.SEND_DONE.format(sent=result["sent"]), self.menu(user))]
+
+    async def choose_course(self, sender: str, user: dict[str, Any], report: str) -> list[Reply]:
+        """Asks a teacher which course a report is about. With one course there is nothing to ask."""
+        courses = (await self.moodle.get_courses(sender)).get("courses", [])
+        if not courses:
+            return [Reply(texts.COURSES_NONE, self.menu(user))]
+        if len(courses) == 1:
+            courseid = int(courses[0]["id"])
+            if report == "INACTIVE":
+                return await self.inactive(sender, user, courseid)
+            return await self.choose_quiz(sender, user, courseid)
+
+        lines = [texts.COURSE_PICK_HEADER]
+        choices: list[tuple[str, str]] = []
+        for number, course in enumerate(courses[:MAX_CHOICES], start=1):
+            lines.append(texts.COURSE_PICK_LINE.format(n=number, name=course["fullname"], students=course["students"]))
+            choices.append((f"{number}. {course['fullname']}", f"{COURSE_STEPS[report]}:{course['id']}"))
+        if len(courses) > MAX_CHOICES:
+            lines.append(texts.COURSE_MORE.format(count=len(courses) - MAX_CHOICES))
+        lines += ["", texts.COURSE_PICK]
+        return [Reply("\n".join(lines), choices + [(texts.NO, "CANCEL")])]
 
     async def inactive(self, sender: str, user: dict[str, Any], courseid: int) -> list[Reply]:
         """Shows a teacher the inactive students of one course. Nothing is sent to the students."""
