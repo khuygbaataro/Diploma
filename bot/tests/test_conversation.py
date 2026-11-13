@@ -1,12 +1,14 @@
 """Tests for what the bot answers."""
 
 import asyncio
+import logging
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 
+from darimaa_bot import texts
 from darimaa_bot.conversation import Bot, extract_code, intent
 from darimaa_bot.messenger import Incoming
 
@@ -201,3 +203,22 @@ def test_runtime_requirements_are_pinned_and_include_tzdata():
     assert all("==" in line for line in lines)
     # Windows has no time zone database of its own.
     assert any(line.startswith("tzdata==") for line in lines)
+
+
+def test_unexpected_errors_are_logged_and_the_user_gets_an_answer(setup, caplog):
+    bot, moodle, messenger = setup
+    moodle.links["psid-a"] = 7
+
+    async def broken(*args, **kwargs):
+        raise KeyError("name")
+
+    moodle.get_deadlines = broken
+    with caplog.at_level(logging.ERROR):
+        run(bot.handle(tap("psid-a", "PLAN", "k1")))
+    assert messenger.last().text == texts.ERROR
+    assert "Unexpected error" in caplog.text
+    assert "KeyError" in caplog.text
+
+    # The bot keeps answering afterwards.
+    run(bot.handle(tap("psid-a", "HELP", "k2")))
+    assert messenger.last().text.startswith("Би ингэж тусалж чадна")

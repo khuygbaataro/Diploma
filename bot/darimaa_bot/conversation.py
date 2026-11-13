@@ -100,6 +100,10 @@ class Bot:
         except httpx.HTTPError as error:
             log.error("Could not reach Moodle: %s", error)
             replies = [Reply(texts.ERROR)]
+        except Exception:
+            # Anything else is a bug or an answer we did not expect. The user still gets a reply.
+            log.exception("Unexpected error while answering a message")
+            replies = [Reply(texts.ERROR)]
 
         for reply in replies:
             try:
