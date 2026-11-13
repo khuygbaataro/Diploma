@@ -22,6 +22,8 @@ CODE_ALPHABET = set("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
 CODE_PATTERN = re.compile(r"(?<![A-Za-z0-9])([A-Za-z0-9]{4})[-\s]?([A-Za-z0-9]{4})(?![A-Za-z0-9])")
 MAX_ITEMS = 8
 MAX_ASSIGNMENTS = 10
+MAX_STUDENTS = 15
+INACTIVE_DAYS = 7
 
 # Checked in this order. Short words must match as whole words, longer ones anywhere.
 KEYWORDS: list[tuple[str, list[str]]] = [
@@ -146,6 +148,8 @@ class Bot:
             return await self.confirm_send(sender, user, int(argument))
         if name == "SEND" and argument.isdigit():
             return await self.send(sender, user, int(argument))
+        if name == "INACTIVE_COURSE" and argument.isdigit():
+            return await self.inactive(sender, user, int(argument))
         if name == "UNLINK":
             return [Reply(texts.UNLINK_CONFIRM, buttons=[(texts.YES_UNLINK, "UNLINK_YES"), (texts.NO, "CANCEL")])]
         if name == "UNLINK_YES":
@@ -251,6 +255,44 @@ class Bot:
         if not result.get("sent"):
             return [Reply(texts.SEND_NONE, self.menu(user))]
         return [Reply(texts.SEND_DONE.format(sent=result["sent"]), self.menu(user))]
+
+    async def inactive(self, sender: str, user: dict[str, Any], courseid: int) -> list[Reply]:
+        """Shows a teacher the inactive students of one course. Nothing is sent to the students."""
+        if not user.get("isteacher"):
+            return [Reply(texts.NO_PERMISSION, self.menu(user))]
+        data = await self.moodle.get_inactive_students(sender, courseid, days=INACTIVE_DAYS)
+        if not data.get("linked"):
+            return [Reply(texts.not_linked(user.get("linkurl", "")))]
+        if not data.get("lastaccessavailable", True):
+            return [Reply(texts.INACTIVE_HIDDEN, self.menu(user))]
+
+        course = data.get("coursename", "")
+        days = data.get("days", INACTIVE_DAYS)
+        students = [student for student in data.get("students", []) if student.get("inactive")]
+        if not students:
+            return [Reply(texts.INACTIVE_EMPTY.format(course=course, days=days), self.menu(user))]
+
+        with_hours = bool(data.get("timeavailable"))
+        lines = [texts.INACTIVE_HEADER.format(course=course, count=len(students), days=days)]
+        for student in students[:MAX_STUDENTS]:
+            dayssince = int(student.get("dayssince", -1))
+            template = texts.INACTIVE_LINE if with_hours else texts.INACTIVE_LINE_NO_HOURS
+            lines.append(template.format(
+                student=self.student_label(student),
+                last=texts.INACTIVE_NEVER if dayssince < 0 else texts.INACTIVE_DAYS_AGO.format(days=dayssince),
+                hours=f"{max(0, int(student.get('minutes', 0))) / 60:.1f}",
+                missing=student.get("missing", 0),
+            ))
+        if len(students) > MAX_STUDENTS:
+            lines.append(texts.INACTIVE_MORE.format(count=len(students) - MAX_STUDENTS))
+        if with_hours:
+            lines += ["", texts.INACTIVE_HOURS_NOTE]
+        return [Reply("\n".join(lines), self.menu(user))]
+
+    @staticmethod
+    def student_label(student: dict[str, Any]) -> str:
+        """The student code and name, as teachers know the student."""
+        return " ".join(part for part in (str(student.get("code", "")), str(student.get("fullname", ""))) if part)
 
     def menu(self, user: dict[str, Any]) -> list[tuple[str, str]]:
         choices = [(texts.MENU_PLAN, "PLAN"), (texts.MENU_OVERDUE, "OVERDUE")]

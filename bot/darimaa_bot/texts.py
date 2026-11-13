@@ -62,6 +62,17 @@ SEND_RECENT = "Энэ даалгаврын сануулгыг саяхан яв�
 SEND_GONE = "Энэ даалгавар жагсаалтад алга. «Илгээгээгүй» гэж бичээд дахин сонгоно уу."
 CANCELLED = "За, болиулсан."
 
+# Reports for teachers. They only show data: nothing is sent to students.
+INACTIVE_HEADER = "«{course}»: идэвхгүй {count} оюутан (сүүлийн {days} хоногт ороогүй):"
+INACTIVE_LINE = "• {student}: {last}, ≈{hours} цаг, илгээгээгүй даалгавар {missing}"
+INACTIVE_LINE_NO_HOURS = "• {student}: {last}, илгээгээгүй даалгавар {missing}"
+INACTIVE_NEVER = "огт ороогүй"
+INACTIVE_DAYS_AGO = "{days} хоногийн өмнө орсон"
+INACTIVE_MORE = "…бас {count} оюутан байна."
+INACTIVE_HOURS_NOTE = "≈ тэмдэгтэй цаг нь Moodle-ийн бүртгэлээс тооцсон ойролцоо тоо."
+INACTIVE_EMPTY = "«{course}»: сүүлийн {days} хоногт бүх оюутан орж ирсэн байна."
+INACTIVE_HIDDEN = "Энэ сайт оюутны сүүлд орсон огноог нуудаг тул идэвхгүй оюутныг харуулах боломжгүй."
+
 UNLINK_CONFIRM = "Messenger-ээ Moodle данснаас салгах уу? Дараа нь дахин холбож болно."
 UNLINK_DONE = "Салгалаа. Дахин холбох бол Moodle-ээс шинэ код аваарай."
 
