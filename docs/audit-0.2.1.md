@@ -106,3 +106,47 @@ Ordered by how soon they should be handled.
     baseline; it must change before any release to real users.
 16. **Local development is not reproducible on Windows as documented.** Besides `tzdata`
     (risk 2), the README assumes Linux. A short "run the tests on Windows" note would help.
+
+## Status after 0.2.2
+
+Date: 2026-11-13. Release 0.2.2 (plugin version 2026111301, bot 0.2.2, release commit
+`0fad1de`) closes the small findings. The text above still describes 0.2.1 and its line
+numbers refer to the 0.2.1 files.
+
+### Fixed
+
+| Finding | What changed | Commit |
+|---------|--------------|--------|
+| Rule 1a, privacy metadata | The link table lists all seven stored fields. A new external location describes what the bot's server gets; the chat app location adds the teacher overview. A test compares the metadata with the table columns, the function replies and the language strings. | `eb17cc8` |
+| Rule 1b, coding standard | The phpcs step runs with `--standard moodle-extra`. The standard adds only constant visibility and data provider checks to `moodle`, and the plugin code needed no changes. | `21d4549` |
+| Rule 6, unused personal data | `local_darimaa_get_user` no longer returns the user id, full name and language. | `116f08c` |
+| Rule 6, ids in the log | The bot logs a 12-character hash of the Messenger account id, never the id. | `3c8db84` |
+| Rule 8, service name | A test fails if the service name 'Darimaa bot' or its short name changes. | `bf5e439` |
+| Risk 1, Page token in the log | The token is sent in an `Authorization` header. A test checks that no token reaches the log. | `0f059d7` |
+| Risk 2, `tzdata` | `tzdata` is pinned in `bot/requirements.txt`. | `b80c018` |
+| Risk 6, unexpected errors | The message handler logs any other exception and sends the generic error text. | `e9b4ae3` |
+| Risk 10, deleted users | A `user_deleted` observer removes the user's links and waiting codes. | `f13cab8` |
+
+### Partly fixed
+
+- **Rule 2, tests.** Each fix above came with tests. Still without tests: `cli/setup_bot.php`,
+  the reminder form validation, the three pages (no Behat), team submissions, the user
+  preferences navigation callback, and the bot's `config.py`, `memory.py` and
+  `setup_profile.py`.
+- **Risk 1.** The code is fixed, but a Page token that was used before the fix is still in the
+  old server log. It must be replaced on Meta and in `.env` by the administrator.
+- **Risk 9, data sent to Meta.** The plugin's privacy metadata is now complete (`eb17cc8`).
+  The site's own privacy notice is still to be written.
+- **Risk 10.** Links of users who were deleted before the upgrade to 0.2.2 are not cleaned up
+  by the upgrade. They are ignored at read time, as before.
+- **Risk 11, log retention.** The log no longer holds Messenger ids (`3c8db84`). How long the
+  journal is kept is still undecided.
+- **Risk 16, Windows.** The tests now run on Windows without extra packages (`b80c018`).
+
+### Still open
+
+- **Rule 3 and rule 4** (AI in Moodle, chat AI agent): not built yet.
+- **Rule 5** (approval queue; the chat confirmation shows only a count): out of scope for 0.2.2.
+- **Rule 9** (Mongolian language pack for the plugin): out of scope for 0.2.2.
+- **Risk 3** (optional IP restriction of the bot token): out of scope for 0.2.2.
+- **Risks 4, 5, 7, 8, 12, 13, 14 and 15**: unchanged.
