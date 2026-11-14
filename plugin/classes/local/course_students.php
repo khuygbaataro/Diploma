@@ -19,14 +19,35 @@ namespace local_darimaa\local;
 /**
  * Finds the students of a course and the groups a teacher may see.
  *
- * A student is a user with an active enrolment and a gradebook role, as in the grader report.
- * Every method works on the whole course with one query, never one query per student.
+ * This class is the one place that says who counts as a student. A student:
+ *  - has an active enrolment in the course,
+ *  - has a gradebook role, as in the grader report,
+ *  - has an account that can log in: not suspended and not of the type "nologin".
+ *
+ * Moodle versions disagree about accounts that cannot log in, so the rule is applied here and
+ * not left to Moodle. Every method works on the whole course with one query, never one query
+ * per student.
  *
  * @package    local_darimaa
  * @copyright  2026 Khuygbaatar Ochirkhuyag
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class course_students {
+    /** @var string The account type that can never log in. */
+    public const NOLOGIN = 'nologin';
+
+    /**
+     * Whether an account can log in: it is not suspended and not of the type "nologin".
+     *
+     * Reports leave out the accounts that cannot log in, and reminders are not sent to them.
+     *
+     * @param \stdClass $user A user record with the fields suspended and auth.
+     * @return bool
+     */
+    public static function can_log_in(\stdClass $user): bool {
+        return empty($user->suspended) && ($user->auth ?? '') !== self::NOLOGIN;
+    }
+
     /**
      * Returns the groups a teacher is limited to in a course.
      *
@@ -68,8 +89,8 @@ class course_students {
     /**
      * Builds the SQL that selects the user ids of the students of a course.
      *
-     * The result has one column, userid. Build it once for each place it is used in a query,
-     * because its parameter names are unique.
+     * The result has one column, userid. Use it at most once in a query, and build it again for
+     * the next query, because of its parameter names.
      *
      * @param \core\context\course $context The course context.
      * @param int[]|null $groupids Only members of these groups, or null for all students.
@@ -91,12 +112,15 @@ class course_students {
             'stdctx'
         );
 
+        // The last line is the same rule as can_log_in(), in SQL.
         $sql = "SELECT DISTINCT stdra.userid
                   FROM {role_assignments} stdra
                   JOIN ($enrolledsql) stden ON stden.id = stdra.userid
-                 WHERE stdra.roleid $rolesql AND stdra.contextid $contextsql";
+                  JOIN {user} stdu ON stdu.id = stdra.userid
+                 WHERE stdra.roleid $rolesql AND stdra.contextid $contextsql
+                       AND stdu.suspended = 0 AND stdu.auth <> :stdnologin";
 
-        return [$sql, $enrolledparams + $roleparams + $contextparams];
+        return [$sql, $enrolledparams + $roleparams + $contextparams + ['stdnologin' => self::NOLOGIN]];
     }
 
     /**
