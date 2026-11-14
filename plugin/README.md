@@ -62,6 +62,23 @@ functions. The technical name of the plugin is `local_darimaa`.
 - **Session timeout (minutes)** (0.3): default 30. Used to estimate the time a student spent in a
   course: the pause between two actions of a student counts only when it is shorter than this.
 
+## Who counts as a student
+
+The reports for teachers (inactive students, quiz results by topic, and the student and finished
+counts in the course list) use one definition of a student:
+
+- an active enrolment in the course,
+- a gradebook role (*Site administration > Grades > General settings > Graded roles*),
+- an account that can log in: not suspended, and not of the type "No login".
+
+Missing submissions and reminders follow the assignment instead: everybody who may submit to the
+assignment, without suspended accounts and accounts of the type "No login". Such accounts are
+never listed, never counted and never get a reminder.
+
+From 0.3.1 the plugin applies the last rule itself, so the result is the same on Moodle 5.0 and on
+later versions. Before that it depended on Moodle: 5.0 left these accounts out of the participants
+of an assignment, later versions did not, and the reports for teachers still counted them.
+
 ## Setting up the Messenger bot
 
 Run this once on the server, from the Moodle folder, as the web server user:

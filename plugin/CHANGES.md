@@ -1,5 +1,21 @@
 # Changes
 
+## 0.3.1 (2026-11-15)
+
+Accounts that cannot log in are left out everywhere, with the same result on Moodle 5.0 and 5.3.
+No database changes, no new settings, and the web service functions keep their parameters and
+replies.
+
+- One definition of a student for the reports for teachers: an active enrolment, a gradebook role
+  and an account that is not suspended and not of the type "No login". The inactive students
+  report, the quiz results by topic and the student and finished counts of the course list no
+  longer include suspended and "No login" accounts.
+- Missing submissions and reminders leave the same accounts out on every Moodle version: on the
+  Moodle pages and in `local_darimaa_get_missing`, `local_darimaa_send_reminders` and the `missing`
+  count of `local_darimaa_get_inactive_students`. Before, Moodle 5.0 left them out and later
+  versions listed them and sent them reminders.
+- README: new section "Who counts as a student".
+
 ## 0.3.0 (2026-11-13)
 
 Reports for teachers. Everything in this release only reads data: nothing is sent to students and
