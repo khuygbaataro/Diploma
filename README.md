@@ -8,5 +8,8 @@
 | `plugin/` | Moodle plugin `local_darimaa` (PHP, Moodle 5.0–5.3) |
 | `bot/` | Туслах сервер (Python, FastAPI): Messenger бот, AI агент |
 | `docs/` | Дипломын баримтууд |
+| `tools/` | Суулгах багц үүсгэх скрипт, туршилтын демо хичээлийн скриптүүд |
 
 Ажиллах дүрмийг `CLAUDE.md`-ээс харна.
+
+Туршилтын сайт дээр суулгах зааврыг [docs/deploy-test-site.md](docs/deploy-test-site.md)-ээс харна.
