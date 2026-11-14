@@ -1,14 +1,16 @@
 name: Moodle Plugin CI
 
-# Runs only when the plugin or this workflow file changes.
+# Runs only when the plugin, the demo course scripts or this workflow file change.
 on:
   push:
     paths:
       - 'plugin/**'
+      - 'tools/demo/**'
       - '.github/workflows/plugin-ci.yml'
   pull_request:
     paths:
       - 'plugin/**'
+      - 'tools/demo/**'
       - '.github/workflows/plugin-ci.yml'
 
 permissions:
@@ -123,6 +125,30 @@ jobs:
         id: behat
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci behat --profile chrome --scss-deprecations
+
+      # The demo course scripts are not part of the plugin. They are tried on a normal site
+      # database: create, check, a second create that must be refused, delete, check it is gone.
+      - name: Demo course (create, check, delete)
+        if: ${{ !cancelled() }}
+        run: |
+          admin=$(ls -d moodle/public/admin moodle/admin 2>/dev/null | head -n 1)
+          demo=repo/tools/demo
+          config=moodle/config.php
+          # The tests above use their own databases. The password is random and used nowhere else.
+          php "$admin/cli/install_database.php" --agree-license --fullname="Demo site" --shortname=demo \
+            --adminpass="$(openssl rand -hex 12)Aa1!" --adminemail=admin@example.invalid
+          # A normal site has no PHPUnit or other developer packages. Remove them, to prove that
+          # the scripts do not need them. Nothing after this step uses them.
+          composer install --no-dev --no-interaction --no-progress --working-dir=moodle
+          php $demo/create_demo_course.php --config=$config --confirm
+          php $demo/check_demo_course.php --config=$config
+          if php $demo/create_demo_course.php --config=$config --confirm; then
+            echo "The second run should have been refused."
+            exit 1
+          fi
+          php $demo/check_demo_course.php --config=$config
+          php $demo/create_demo_course.php --config=$config --delete --confirm
+          php $demo/check_demo_course.php --config=$config --gone
 
       - name: Mark cancelled jobs as failed.
         if: ${{ cancelled() }}
