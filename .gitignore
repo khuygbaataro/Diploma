@@ -21,3 +21,6 @@ __pycache__/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Install packages built by tools/package.py
+dist/
