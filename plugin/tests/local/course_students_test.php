@@ -104,4 +104,37 @@ final class course_students_test extends \advanced_testcase {
         $generator->enrol_user($tutor->id, $open->id, 'teacher');
         $this->assertNull(course_students::get_course_scope($open, $tutor));
     }
+
+    /**
+     * A suspended account with an active enrolment is not a student.
+     */
+    public function test_suspended_accounts_are_not_students(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $context = \core\context\course::instance($course->id);
+        $anu = $generator->create_and_enrol($course, 'student', ['firstname' => 'Anu']);
+        $suspended = $generator->create_and_enrol($course, 'student', ['firstname' => 'Bold', 'suspended' => 1]);
+
+        $this->assertEquals([$anu->id], array_keys(course_students::get_users($context)));
+        $this->assertSame(1, course_students::count($context));
+        $this->assertTrue(course_students::can_log_in($anu));
+        $this->assertFalse(course_students::can_log_in($suspended));
+    }
+
+    /**
+     * An account of the type "nologin" with an active enrolment is not a student.
+     */
+    public function test_nologin_accounts_are_not_students(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $context = \core\context\course::instance($course->id);
+        $anu = $generator->create_and_enrol($course, 'student', ['firstname' => 'Anu']);
+        $nologin = $generator->create_and_enrol($course, 'student', ['firstname' => 'Saraa', 'auth' => 'nologin']);
+
+        $this->assertEquals([$anu->id], array_keys(course_students::get_users($context)));
+        $this->assertSame(1, course_students::count($context));
+        $this->assertFalse(course_students::can_log_in($nologin));
+    }
 }

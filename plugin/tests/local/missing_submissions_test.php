@@ -164,4 +164,38 @@ final class missing_submissions_test extends \advanced_testcase {
         $this->setUser($students[1]);
         $this->assertSame([], missing_submissions::get_course_summary($course));
     }
+
+    /**
+     * Checks that an account with an active enrolment is not listed or counted as missing a submission.
+     *
+     * @param array $account Fields of the account that cannot log in.
+     */
+    private function check_account_is_not_missing(array $account): void {
+        $this->resetAfterTest();
+        [$course, $teacher, $students, $assign] = $this->create_course_with_assignment();
+        $this->getDataGenerator()->create_and_enrol($course, 'student', $account);
+
+        $this->setUser($teacher);
+        $expected = [$students[0]->id, $students[1]->id, $students[2]->id];
+        $this->assertEqualsCanonicalizing($expected, array_keys(missing_submissions::get_missing_users($assign)));
+        $this->assertEqualsCanonicalizing(
+            $expected,
+            array_keys(missing_submissions::get_missing_users_for($assign, $teacher))
+        );
+        $this->assertSame(3, missing_submissions::get_course_summary($course)[0]->missing);
+    }
+
+    /**
+     * A suspended account is not missing a submission, on every Moodle version.
+     */
+    public function test_suspended_accounts_are_not_missing(): void {
+        $this->check_account_is_not_missing(['firstname' => 'Tuya', 'suspended' => 1]);
+    }
+
+    /**
+     * An account of the type "nologin" is not missing a submission, on every Moodle version.
+     */
+    public function test_nologin_accounts_are_not_missing(): void {
+        $this->check_account_is_not_missing(['firstname' => 'Gerel', 'auth' => 'nologin']);
+    }
 }

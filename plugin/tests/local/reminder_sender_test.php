@@ -106,4 +106,30 @@ final class reminder_sender_test extends \advanced_testcase {
             static fn($event) => $event instanceof reminders_sent
         ));
     }
+
+    /**
+     * Even when they are passed in, a suspended account and an account that cannot log in get no reminder.
+     */
+    public function test_send_skips_accounts_that_cannot_log_in(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $teacher = $generator->create_and_enrol($course, 'editingteacher');
+        $anu = $generator->create_and_enrol($course, 'student', ['firstname' => 'Anu']);
+        $suspended = $generator->create_and_enrol($course, 'student', ['firstname' => 'Tuya', 'suspended' => 1]);
+        $nologin = $generator->create_and_enrol($course, 'student', ['firstname' => 'Gerel', 'auth' => 'nologin']);
+
+        $instance = $generator->create_module('assign', ['course' => $course->id]);
+        $cm = get_coursemodule_from_instance('assign', $instance->id);
+        $assign = new \assign(\core\context\module::instance($cm->id), $cm, $course);
+
+        $this->setUser($teacher);
+        $messagesink = $this->redirectMessages();
+        $users = [$anu->id => $anu, $suspended->id => $suspended, $nologin->id => $nologin];
+
+        $this->assertSame(1, reminder_sender::send($assign, $users, 'Hi {firstname}', $teacher));
+        $messages = $messagesink->get_messages();
+        $this->assertCount(1, $messages);
+        $this->assertEquals($anu->id, reset($messages)->useridto);
+    }
 }

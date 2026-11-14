@@ -389,4 +389,23 @@ final class get_inactive_students_test extends \advanced_testcase {
         $this->expectException(\required_capability_exception::class);
         get_inactive_students::execute('messenger', 'psid-404', $course->id);
     }
+
+    /**
+     * A suspended account and an account that cannot log in are not in the report.
+     */
+    public function test_accounts_that_cannot_log_in_are_left_out(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        [$course, $teacher] = $this->create_course();
+        $generator->create_and_enrol($course, 'student', ['firstname' => 'Tuya', 'lastname' => 'Od', 'suspended' => 1]);
+        $generator->create_and_enrol($course, 'student', ['firstname' => 'Gerel', 'lastname' => 'Od', 'auth' => 'nologin']);
+        $this->create_assignment($course, time() - DAYSECS);
+
+        $this->link($teacher, 'psid-t');
+        $this->act_as_bot();
+        $result = $this->call('psid-t', $course->id);
+
+        $this->assertSame(['Anu Dorj', 'Bold Bat', 'Saraa Tsetseg'], array_column($result['students'], 'fullname'));
+        $this->assertSame([1, 1, 1], array_column($result['students'], 'missing'));
+    }
 }

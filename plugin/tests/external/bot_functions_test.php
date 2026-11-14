@@ -272,4 +272,28 @@ final class bot_functions_test extends \advanced_testcase {
         $this->expectException(\required_capability_exception::class);
         send_reminders::execute('messenger', 'psid-1', $cm->id);
     }
+
+    /**
+     * A suspended account and an account that cannot log in are not counted and get no reminder.
+     */
+    public function test_accounts_that_cannot_log_in_get_no_reminder(): void {
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        [$course, $teacher, $students, $cm] = $this->create_course(time() - DAYSECS);
+        $generator->create_and_enrol($course, 'student', ['firstname' => 'Tuya', 'suspended' => 1]);
+        $generator->create_and_enrol($course, 'student', ['firstname' => 'Gerel', 'auth' => 'nologin']);
+        $this->link($teacher, 'psid-t');
+        $this->act_as_bot();
+
+        $result = $this->call(get_missing::class, ['messenger', 'psid-t', 30, 7]);
+        $this->assertSame(2, $result['assignments'][0]['missing']);
+
+        $messagesink = $this->redirectMessages();
+        $result = $this->call(send_reminders::class, ['messenger', 'psid-t', $cm->id]);
+        $this->assertSame(['sent' => 2, 'missing' => 2], $result);
+        $this->assertEqualsCanonicalizing(
+            [$students[0]->id, $students[1]->id],
+            array_map(static fn($message) => $message->useridto, $messagesink->get_messages())
+        );
+    }
 }

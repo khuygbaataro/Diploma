@@ -419,4 +419,35 @@ final class get_quiz_topic_results_test extends \advanced_testcase {
         $this->expectException(\required_capability_exception::class);
         get_quiz_topic_results::execute('messenger', 'psid-404', $quiz->cmid);
     }
+
+    /**
+     * A suspended account and an account that cannot log in are not in the results, even with a finished attempt.
+     */
+    public function test_accounts_that_cannot_log_in_are_left_out(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        [$course, $teacher, $students] = $this->create_course();
+        $tuya = $generator->create_and_enrol($course, 'student', ['firstname' => 'Tuya', 'lastname' => 'Od']);
+        $gerel = $generator->create_and_enrol($course, 'student', ['firstname' => 'Gerel', 'lastname' => 'Od']);
+
+        $quiz = $this->create_quiz($course);
+        $category = $this->create_category($quiz, 'Animals');
+        quiz_add_quiz_question($this->create_question($category, 'shortanswer')->id, $quiz, 0, 1);
+        $this->attempt($quiz, $students['anu'], [1 => ['answer' => 'frog']]);
+        $this->attempt($quiz, $tuya, [1 => ['answer' => 'toad']]);
+        $this->attempt($quiz, $gerel, [1 => ['answer' => 'newt']]);
+
+        // After their attempts one account is suspended and the other can no longer log in.
+        $DB->set_field('user', 'suspended', 1, ['id' => $tuya->id]);
+        $DB->set_field('user', 'auth', 'nologin', ['id' => $gerel->id]);
+
+        $this->link($teacher, 'psid-t');
+        $this->act_as_bot();
+        $result = $this->call('psid-t', $quiz->cmid);
+
+        $this->assertSame(['Anu Dorj'], array_column($result['students'], 'fullname'));
+        $this->assertSame(2, $result['notattempted']);
+        $this->assertEquals([['name' => 'Animals', 'maxmark' => 1, 'average' => 100]], $result['topics']);
+    }
 }

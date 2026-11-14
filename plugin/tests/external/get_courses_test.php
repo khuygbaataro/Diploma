@@ -202,4 +202,33 @@ final class get_courses_test extends \advanced_testcase {
         $this->expectException(\required_capability_exception::class);
         get_courses::execute('messenger', 'psid-1');
     }
+
+    /**
+     * The student and finished counts leave out a suspended account and an account that cannot log in.
+     */
+    public function test_counts_leave_out_accounts_that_cannot_log_in(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course(['fullname' => 'Biology 101']);
+        $teacher = $generator->create_and_enrol($course, 'editingteacher');
+        $anu = $generator->create_and_enrol($course, 'student', ['firstname' => 'Anu']);
+        $tuya = $generator->create_and_enrol($course, 'student', ['firstname' => 'Tuya']);
+        $gerel = $generator->create_and_enrol($course, 'student', ['firstname' => 'Gerel']);
+
+        $quiz = $this->create_quiz($course, ['name' => 'Cells']);
+        foreach ([$anu, $tuya, $gerel] as $student) {
+            $this->attempt($quiz, $student, [1 => ['answer' => 'frog']]);
+        }
+        // After their attempts one account is suspended and the other can no longer log in.
+        $DB->set_field('user', 'suspended', 1, ['id' => $tuya->id]);
+        $DB->set_field('user', 'auth', 'nologin', ['id' => $gerel->id]);
+
+        $this->link($teacher, 'psid-t');
+        $this->act_as_bot();
+        $result = $this->call('psid-t');
+
+        $this->assertSame(1, $result['courses'][0]['students']);
+        $this->assertSame(1, $result['courses'][0]['quizzes'][0]['finished']);
+    }
 }
