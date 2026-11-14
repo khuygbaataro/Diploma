@@ -32,6 +32,7 @@ class reminder_sender {
      *
      * The template can contain {firstname}, {lastname}, {assignment}, {course},
      * {duedate} and {link}. Dates are shown in each student's time zone.
+     * Accounts that cannot log in (suspended, or of the type "nologin") are skipped.
      *
      * @param \assign $assign The assignment.
      * @param \stdClass[] $users Full user records of the students to remind.
@@ -52,6 +53,10 @@ class reminder_sender {
 
         $sent = 0;
         foreach ($users as $user) {
+            // A suspended account, or one that can never log in, gets no reminder.
+            if (!course_students::can_log_in($user)) {
+                continue;
+            }
             $lang = !empty($user->lang) ? $user->lang : null;
 
             $duedate = missing_submissions::get_user_duedate($assign, $user->id);

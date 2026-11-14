@@ -69,6 +69,8 @@ class missing_submissions {
      *
      * Drafts and reopened submissions count as not submitted. In team
      * assignments each student is judged by their team's submission.
+     * Suspended accounts and accounts of the type "nologin" are never listed,
+     * whatever the Moodle version.
      *
      * @param \assign $assign The assignment.
      * @param int $groupid Group id, or 0 for all participants.
@@ -77,7 +79,12 @@ class missing_submissions {
     public static function get_missing_users(\assign $assign, int $groupid = 0): array {
         global $DB;
 
-        $participants = $assign->list_participants($groupid, false);
+        // Accounts that cannot log in are left out here, because Moodle 5.0 leaves them out of the
+        // participants and later versions do not. The records are already loaded: no extra query.
+        $participants = array_filter(
+            $assign->list_participants($groupid, false),
+            [course_students::class, 'can_log_in']
+        );
         if (empty($participants)) {
             return [];
         }
