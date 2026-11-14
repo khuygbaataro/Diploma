@@ -1,0 +1,44 @@
+name: Package
+
+# Started by hand: Actions > Package > Run workflow. The two zip files are then listed
+# under "Artifacts" on the page of the run.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Test the packaging script
+        run: python -m unittest discover -s tools/tests -v
+
+      - name: Build the packages
+        run: python tools/package.py
+
+      - name: Upload the plugin package
+        uses: actions/upload-artifact@v6
+        with:
+          name: local_darimaa
+          path: dist/local_darimaa-*.zip
+          if-no-files-found: error
+
+      - name: Upload the bot package
+        uses: actions/upload-artifact@v6
+        with:
+          name: darimaa-bot
+          path: dist/darimaa-bot-*.zip
+          if-no-files-found: error
