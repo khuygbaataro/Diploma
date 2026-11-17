@@ -1,5 +1,26 @@
 # Changes
 
+## 0.3.2 (2026-11-18)
+
+Reminders can go as Moodle chat messages, and the reminder count tells the truth when email fails.
+No database changes, no new settings, and the web service functions keep their parameters and
+replies.
+
+- On the reminder page the teacher chooses how the reminders go: as a Moodle notification (the bell,
+  and email when the student's settings allow it), as a Moodle chat message from the teacher, or
+  both. In the chat the student can answer the teacher. Moodle decides who may get a chat message:
+  the teacher needs the capability to send messages, and each student's privacy settings count.
+  The page says how many students could not get a chat message. The choice only shows when
+  messaging is turned on for the site.
+
+- Moodle saves a reminder as a notification first, and then emails it. When the email fails,
+  Moodle reports the whole send as failed, although the student already sees the notification in
+  Moodle. Such reminders were counted as not sent, so the page said "Reminders sent: 0" and
+  teachers could send them again. They now count as sent.
+- The reminder page warns when some reminders could not be delivered by every channel (for example
+  email), tells the teacher to check the site's outgoing mail settings and not to send them again.
+- `local_darimaa_send_reminders` counts the same way, so the bot reports the real number.
+
 ## 0.3.1 (2026-11-15)
 
 Accounts that cannot log in are left out everywhere, with the same result on Moodle 5.0 and 5.3.

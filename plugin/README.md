@@ -16,8 +16,9 @@ functions. The technical name of the plugin is `local_darimaa`.
 - **Personal messages**: the placeholders `{firstname}`, `{lastname}`, `{assignment}`, `{course}`,
   `{duedate}` and `{link}` are filled in for each student. The due date includes the student's
   extension or override and is shown in the student's time zone.
-- **Moodle notifications**: reminders arrive as notifications (pop-up and email by default).
-  Students can change this in their notification preferences.
+- **Moodle notifications or chat**: reminders arrive as notifications (pop-up and email by default),
+  as a Moodle chat message from the teacher (0.3.2), or both. The teacher chooses on the reminder
+  page. Students can change the notification ways in their notification preferences.
 - **Safe defaults**: respects separate groups, switches itself off for anonymous submissions,
   hides last access when the site hides that field, and logs a `reminders_sent` event.
 - **Messenger connection** (0.2): users get a one-time code on *Preferences > Messenger connection*
