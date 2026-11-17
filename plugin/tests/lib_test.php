@@ -48,10 +48,12 @@ final class lib_test extends \advanced_testcase {
         $node = \navigation_node::create('Course');
         local_darimaa_extend_navigation_course($node, $course, $context);
         $this->assertNotFalse($node->find('local_darimaa_missing', \navigation_node::TYPE_SETTING));
+        $this->assertNotFalse($node->find('local_darimaa_atrisk', \navigation_node::TYPE_SETTING));
 
         $this->setUser($student);
         $node = \navigation_node::create('Course');
         local_darimaa_extend_navigation_course($node, $course, $context);
         $this->assertFalse($node->find('local_darimaa_missing', \navigation_node::TYPE_SETTING));
+        $this->assertFalse($node->find('local_darimaa_atrisk', \navigation_node::TYPE_SETTING));
     }
 }

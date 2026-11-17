@@ -58,6 +58,111 @@ class quiz_topics {
      *               (code, fullname, percent, ungraded, topics with name, mark, maxmark, percent).
      */
     public static function get_report(\cm_info $cm, \stdClass $teacher): array {
+        $context = $cm->context;
+        [
+            'students' => $students,
+            'results' => $results,
+            'names' => $names,
+            'order' => $order,
+            'usegradeitems' => $usegradeitems,
+        ] = self::compute($cm, $teacher);
+
+        $topics = [];
+        foreach ($order as $topic) {
+            $full = 0.0;
+            $percents = [];
+            foreach ($results as $result) {
+                if (!isset($result['topics'][$topic])) {
+                    continue;
+                }
+                $full = max($full, $result['topics'][$topic]['full']);
+                if ($result['topics'][$topic]['max'] > 0) {
+                    $percents[] = $result['topics'][$topic]['mark'] / $result['topics'][$topic]['max'] * 100;
+                }
+            }
+            $topics[] = [
+                'name' => $names[$topic],
+                'maxmark' => round($full, 2),
+                'average' => $percents ? round(array_sum($percents) / count($percents), 1) : 0.0,
+            ];
+        }
+
+        $codes = student_code::get_for_users(array_keys($results));
+        $viewfullnames = has_capability('moodle/site:viewfullnames', $context, $teacher);
+        $rows = [];
+        foreach ($students as $userid => $student) {
+            if (!isset($results[$userid])) {
+                continue;
+            }
+            $result = $results[$userid];
+            $studenttopics = [];
+            foreach ($order as $topic) {
+                if (isset($result['topics'][$topic])) {
+                    $studenttopics[] = [
+                        'name' => $names[$topic],
+                        'mark' => round($result['topics'][$topic]['mark'], 2),
+                        'maxmark' => round($result['topics'][$topic]['max'], 2),
+                        'percent' => self::percent($result['topics'][$topic]['mark'], $result['topics'][$topic]['max']),
+                    ];
+                }
+            }
+            $rows[] = [
+                'code' => $codes[$userid],
+                'fullname' => fullname($student, $viewfullnames),
+                'percent' => self::percent($result['mark'], $result['max']),
+                'ungraded' => $result['ungraded'],
+                'topics' => $studenttopics,
+            ];
+        }
+        // Students are listed in the order of the names that are shown.
+        usort($rows, static fn(array $a, array $b): int => [$a['fullname'], $a['code']] <=> [$b['fullname'], $b['code']]);
+
+        return [
+            'topicsource' => $usegradeitems ? self::SOURCE_GRADEITEMS : self::SOURCE_CATEGORIES,
+            'notattempted' => count($students) - count($results),
+            'topics' => $topics,
+            'students' => $rows,
+        ];
+    }
+
+    /**
+     * Returns each student's result in a quiz, for other reports.
+     *
+     * @param \cm_info $cm The quiz.
+     * @param \stdClass $teacher The teacher, who only sees their own groups in separate groups mode.
+     * @return array With students (ids of the students the teacher may see) and results, keyed by user id, for
+     *               the students with a finished attempt: percent, graded (false while nothing is marked yet)
+     *               and topics (percentages of the marked questions, keyed by topic name).
+     */
+    public static function get_results_by_user(\cm_info $cm, \stdClass $teacher): array {
+        ['students' => $students, 'results' => $results, 'names' => $names, 'order' => $order] = self::compute($cm, $teacher);
+
+        $byuser = [];
+        foreach ($results as $userid => $result) {
+            $topics = [];
+            foreach ($order as $topic) {
+                if (isset($result['topics'][$topic]) && $result['topics'][$topic]['max'] > 0) {
+                    $topics[$names[$topic]] = self::percent($result['topics'][$topic]['mark'], $result['topics'][$topic]['max']);
+                }
+            }
+            $byuser[$userid] = [
+                'percent' => self::percent($result['mark'], $result['max']),
+                'graded' => $result['max'] > 0,
+                'topics' => $topics,
+            ];
+        }
+        return ['students' => array_map('intval', array_keys($students)), 'results' => $byuser];
+    }
+
+    /**
+     * Adds up the marks of each student's best attempt, for the whole quiz and by topic.
+     *
+     * @param \cm_info $cm The quiz.
+     * @param \stdClass $teacher The teacher, who only sees their own groups in separate groups mode.
+     * @return array With students (user records keyed by id), results (marks keyed by user id), names (topic
+     *               names keyed by topic id), order (topic ids in the order to show) and usegradeitems.
+     */
+    private static function compute(\cm_info $cm, \stdClass $teacher): array {
         global $DB;
 
         $context = $cm->context;
@@ -140,61 +245,12 @@ class quiz_topics {
             $order = array_keys($names);
         }
 
-        $topics = [];
-        foreach ($order as $topic) {
-            $full = 0.0;
-            $percents = [];
-            foreach ($results as $result) {
-                if (!isset($result['topics'][$topic])) {
-                    continue;
-                }
-                $full = max($full, $result['topics'][$topic]['full']);
-                if ($result['topics'][$topic]['max'] > 0) {
-                    $percents[] = $result['topics'][$topic]['mark'] / $result['topics'][$topic]['max'] * 100;
-                }
-            }
-            $topics[] = [
-                'name' => $names[$topic],
-                'maxmark' => round($full, 2),
-                'average' => $percents ? round(array_sum($percents) / count($percents), 1) : 0.0,
-            ];
-        }
-
-        $codes = student_code::get_for_users(array_keys($results));
-        $viewfullnames = has_capability('moodle/site:viewfullnames', $context, $teacher);
-        $rows = [];
-        foreach ($students as $userid => $student) {
-            if (!isset($results[$userid])) {
-                continue;
-            }
-            $result = $results[$userid];
-            $studenttopics = [];
-            foreach ($order as $topic) {
-                if (isset($result['topics'][$topic])) {
-                    $studenttopics[] = [
-                        'name' => $names[$topic],
-                        'mark' => round($result['topics'][$topic]['mark'], 2),
-                        'maxmark' => round($result['topics'][$topic]['max'], 2),
-                        'percent' => self::percent($result['topics'][$topic]['mark'], $result['topics'][$topic]['max']),
-                    ];
-                }
-            }
-            $rows[] = [
-                'code' => $codes[$userid],
-                'fullname' => fullname($student, $viewfullnames),
-                'percent' => self::percent($result['mark'], $result['max']),
-                'ungraded' => $result['ungraded'],
-                'topics' => $studenttopics,
-            ];
-        }
-        // Students are listed in the order of the names that are shown.
-        usort($rows, static fn(array $a, array $b): int => [$a['fullname'], $a['code']] <=> [$b['fullname'], $b['code']]);
-
         return [
-            'topicsource' => $usegradeitems ? self::SOURCE_GRADEITEMS : self::SOURCE_CATEGORIES,
-            'notattempted' => count($students) - count($results),
-            'topics' => $topics,
-            'students' => $rows,
+            'students' => $students,
+            'results' => $results,
+            'names' => $names,
+            'order' => $order,
+            'usegradeitems' => $usegradeitems,
         ];
     }
 

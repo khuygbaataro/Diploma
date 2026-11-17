@@ -23,7 +23,7 @@
  */
 
 /**
- * Adds a "Missing submissions" link to the course navigation for teachers.
+ * Adds the "Missing submissions" and "Students who need attention" links to the course navigation for teachers.
  *
  * @param navigation_node $navigation The course navigation node.
  * @param stdClass $course The course.
@@ -42,6 +42,17 @@ function local_darimaa_extend_navigation_course($navigation, $course, $context):
         'local_darimaa_missing',
         new \core\output\pix_icon('i/report', '')
     );
+
+    if (has_capability('moodle/course:viewparticipants', $context)) {
+        $navigation->add(
+            get_string('atrisk', 'local_darimaa'),
+            new \core\url('/local/darimaa/atrisk.php', ['id' => $course->id]),
+            navigation_node::TYPE_SETTING,
+            null,
+            'local_darimaa_atrisk',
+            new \core\output\pix_icon('i/warning', '')
+        );
+    }
 }
 
 /**

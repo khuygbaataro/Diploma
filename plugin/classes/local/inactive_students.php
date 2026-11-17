@@ -60,6 +60,31 @@ class inactive_students {
      *               lastaccess, dayssince, minutes, missing and inactive. Inactive students come first.
      */
     public static function get_report(\stdClass $course, \stdClass $teacher, int $days): array {
+        $data = self::get_rows_by_user($course, $teacher, $days);
+        $rows = array_values($data['students']);
+
+        // Inactive students first: those who never came, then the longest away. The rest stay in name order.
+        usort($rows, static function (array $a, array $b): int {
+            return [!$a['inactive'], $a['inactive'] ? $a['lastaccess'] : 0, $a['fullname']]
+                <=> [!$b['inactive'], $b['inactive'] ? $b['lastaccess'] : 0, $b['fullname']];
+        });
+
+        return [
+            'lastaccessavailable' => $data['lastaccessavailable'],
+            'timeavailable' => $data['timeavailable'],
+            'students' => $rows,
+        ];
+    }
+
+    /**
+     * Builds the same rows as get_report(), keyed by user id and in name order, for other reports.
+     *
+     * @param \stdClass $course The course.
+     * @param \stdClass $teacher The teacher.
+     * @param int $days A student with no course access for this many days is inactive.
+     * @return array With lastaccessavailable, timeavailable and students (rows keyed by user id).
+     */
+    public static function get_rows_by_user(\stdClass $course, \stdClass $teacher, int $days): array {
         global $DB;
 
         $context = \core\context\course::instance($course->id);
@@ -87,7 +112,7 @@ class inactive_students {
         $rows = [];
         foreach ($students as $userid => $student) {
             $last = $lastaccessavailable ? (int) ($lastaccess[$userid] ?? 0) : 0;
-            $rows[] = [
+            $rows[$userid] = [
                 'code' => $codes[$userid],
                 'fullname' => fullname($student, $viewfullnames),
                 'lastaccess' => $last,
@@ -97,12 +122,6 @@ class inactive_students {
                 'inactive' => $lastaccessavailable && (!$last || $now - $last >= $days * DAYSECS),
             ];
         }
-
-        // Inactive students first: those who never came, then the longest away. The rest stay in name order.
-        usort($rows, static function (array $a, array $b): int {
-            return [!$a['inactive'], $a['inactive'] ? $a['lastaccess'] : 0, $a['fullname']]
-                <=> [!$b['inactive'], $b['inactive'] ? $b['lastaccess'] : 0, $b['fullname']];
-        });
 
         return [
             'lastaccessavailable' => $lastaccessavailable,
