@@ -22,7 +22,8 @@ namespace local_darimaa\event;
  * @property-read array $other {
  *      Extra information about the event.
  *
- *      - int count: number of reminders sent.
+ *      - int count: number of students who got the reminder.
+ *      - string channel: (optional) how it went: notification, chat or both.
  * }
  *
  * @package    local_darimaa
@@ -53,7 +54,8 @@ class reminders_sent extends \core\event\base {
      * @return string
      */
     public function get_description() {
-        return "The user with id '{$this->userid}' sent {$this->other['count']} reminder(s) for the assignment " .
+        $channel = isset($this->other['channel']) ? " as {$this->other['channel']}" : '';
+        return "The user with id '{$this->userid}' sent {$this->other['count']} reminder(s){$channel} for the assignment " .
             "with course module id '{$this->contextinstanceid}'.";
     }
 

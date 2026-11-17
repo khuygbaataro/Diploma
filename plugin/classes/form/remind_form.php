@@ -24,7 +24,8 @@ require_once($CFG->libdir . '/formslib.php');
 /**
  * Form for choosing students and writing the reminder text.
  *
- * Custom data: 'students' (user id => label) and 'message' (default text).
+ * Custom data: 'students' (user id => label), 'message' (default text) and 'canchat'
+ * (whether the reminder may also go as a Moodle chat message).
  *
  * @package    local_darimaa
  * @copyright  2026 Khuygbaatar Ochirkhuyag
@@ -48,6 +49,18 @@ class remind_form extends \moodleform {
         // Everyone is ticked to start with; the teacher unticks whoever should not get a reminder.
         // The last argument is the starting state the "Select all/none" controller gives the checkboxes.
         $this->add_checkbox_controller(1, null, null, 1);
+
+        // The chat is offered only when Moodle's messaging is on and the teacher may send messages.
+        if (!empty($this->_customdata['canchat'])) {
+            $mform->addElement('select', 'channel', get_string('channel', 'local_darimaa'), [
+                \local_darimaa\local\reminder_sender::CHANNEL_NOTIFICATION => get_string('channel_notification', 'local_darimaa'),
+                \local_darimaa\local\reminder_sender::CHANNEL_CHAT => get_string('channel_chat', 'local_darimaa'),
+                \local_darimaa\local\reminder_sender::CHANNEL_BOTH => get_string('channel_both', 'local_darimaa'),
+            ]);
+            $mform->setType('channel', PARAM_ALPHA);
+            $mform->setDefault('channel', \local_darimaa\local\reminder_sender::CHANNEL_NOTIFICATION);
+            $mform->addHelpButton('channel', 'channel', 'local_darimaa');
+        }
 
         $mform->addElement('textarea', 'message', get_string('message', 'local_darimaa'), ['rows' => 10, 'cols' => 70]);
         $mform->setType('message', PARAM_TEXT);

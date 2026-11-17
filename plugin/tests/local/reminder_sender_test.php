@@ -132,4 +132,143 @@ final class reminder_sender_test extends \advanced_testcase {
         $this->assertCount(1, $messages);
         $this->assertEquals($anu->id, reset($messages)->useridto);
     }
+
+    /**
+     * Creates a course with an editing teacher, two students and an assignment.
+     *
+     * @return array The teacher, the two students and the assignment.
+     */
+    private function create_assignment_with_students(): array {
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course(['fullname' => 'Biology 101']);
+        $teacher = $generator->create_and_enrol($course, 'editingteacher', ['firstname' => 'Bat']);
+        $anu = $generator->create_and_enrol($course, 'student', ['firstname' => 'Anu']);
+        $bold = $generator->create_and_enrol($course, 'student', ['firstname' => 'Bold']);
+        $instance = $generator->create_module('assign', ['course' => $course->id, 'name' => 'Lab report']);
+        $cm = get_coursemodule_from_instance('assign', $instance->id);
+        $assign = new \assign(\core\context\module::instance($cm->id), $cm, $course);
+        return [$teacher, $anu, $bold, $assign];
+    }
+
+    /**
+     * Returns the chat messages one user sent to another.
+     *
+     * @param \stdClass $from The sender.
+     * @param \stdClass $to The recipient.
+     * @return \stdClass[] Message records, oldest first.
+     */
+    private function chat_messages(\stdClass $from, \stdClass $to): array {
+        global $DB;
+
+        $conversationid = \core_message\api::get_conversation_between_users([$from->id, $to->id]);
+        if (!$conversationid) {
+            return [];
+        }
+        return array_values($DB->get_records('messages', ['conversationid' => $conversationid, 'useridfrom' => $from->id], 'id'));
+    }
+
+    /**
+     * A notification that Moodle saved counts as delivered, even when a channel such as email failed.
+     *
+     * Moodle's message_send() returns false in that case, although the student already sees the
+     * notification. Counting it as not sent made teachers send the reminder again.
+     */
+    public function test_delivery_status_tells_a_saved_notification_from_a_lost_one(): void {
+        $message = new \core\message\message();
+        $this->assertSame(reminder_sender::DELIVERED, reminder_sender::delivery_status(42, $message));
+        $this->assertSame(reminder_sender::NOT_DELIVERED, reminder_sender::delivery_status(false, $message));
+
+        // Moodle saved the notification, and then a channel such as email failed.
+        $message->savedmessageid = 42;
+        $this->assertSame(reminder_sender::PARTLY_DELIVERED, reminder_sender::delivery_status(false, $message));
+        $this->assertSame(reminder_sender::DELIVERED, reminder_sender::delivery_status(42, $message));
+    }
+
+    /**
+     * A reminder can go as a Moodle chat message from the teacher instead of a notification.
+     */
+    public function test_send_as_chat_message(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$teacher, $anu, $bold, $assign] = $this->create_assignment_with_students();
+        $this->setUser($teacher);
+        $this->redirectMessages();
+        $eventsink = $this->redirectEvents();
+
+        $users = [$anu->id => $anu, $bold->id => $bold];
+        $template = "Hi {firstname},\nplease submit {assignment}.";
+        $report = reminder_sender::send_with_report($assign, $users, $template, $teacher, reminder_sender::CHANNEL_CHAT);
+
+        $this->assertSame(['sent' => 2, 'incomplete' => 0, 'chat' => 2, 'chatrefused' => 0], $report);
+        $this->assertSame(0, $DB->count_records('notifications', ['component' => 'local_darimaa']));
+        $messages = $this->chat_messages($teacher, $anu);
+        $this->assertCount(1, $messages);
+        $this->assertStringContainsString('Hi Anu', $messages[0]->fullmessage);
+        $this->assertStringContainsString('please submit Lab report.', $messages[0]->fullmessage);
+        $this->assertCount(1, $this->chat_messages($teacher, $bold));
+
+        $events = array_values(array_filter($eventsink->get_events(), static fn($e) => $e instanceof reminders_sent));
+        $this->assertCount(1, $events);
+        $this->assertSame(2, $events[0]->other['count']);
+        $this->assertSame('chat', $events[0]->other['channel']);
+    }
+
+    /**
+     * Both ways at once: a notification and a chat message, and a later reminder joins the same chat.
+     */
+    public function test_send_both_ways(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$teacher, $anu, $bold, $assign] = $this->create_assignment_with_students();
+        $this->setUser($teacher);
+        $this->redirectMessages();
+
+        $users = [$anu->id => $anu, $bold->id => $bold];
+        $report = reminder_sender::send_with_report($assign, $users, 'Hi {firstname}', $teacher, reminder_sender::CHANNEL_BOTH);
+        $this->assertSame(['sent' => 2, 'incomplete' => 0, 'chat' => 2, 'chatrefused' => 0], $report);
+        $this->assertSame(2, $DB->count_records('notifications', ['component' => 'local_darimaa']));
+
+        $conversationid = \core_message\api::get_conversation_between_users([$teacher->id, $anu->id]);
+        reminder_sender::send_with_report($assign, [$anu->id => $anu], 'Hi again', $teacher, reminder_sender::CHANNEL_CHAT);
+        $this->assertSame($conversationid, \core_message\api::get_conversation_between_users([$teacher->id, $anu->id]));
+        $this->assertCount(2, $this->chat_messages($teacher, $anu));
+    }
+
+    /**
+     * Moodle decides who may get a chat message: those who cannot are counted, and the notification still goes.
+     */
+    public function test_chat_is_refused_when_moodle_does_not_allow_it(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$teacher, $anu, $bold, $assign] = $this->create_assignment_with_students();
+        $this->setUser($teacher);
+        $this->redirectMessages();
+        $users = [$anu->id => $anu, $bold->id => $bold];
+
+        // Messaging is off on the site: nobody can get a chat message.
+        set_config('messaging', 0);
+        $report = reminder_sender::send_with_report($assign, $users, 'Hi {firstname}', $teacher, reminder_sender::CHANNEL_CHAT);
+        $this->assertSame(['sent' => 0, 'incomplete' => 0, 'chat' => 0, 'chatrefused' => 2], $report);
+
+        // Messaging is on, but the teacher may not send messages: the notifications still go.
+        set_config('messaging', 1);
+        $roleid = $DB->get_field('role', 'id', ['shortname' => 'user'], MUST_EXIST);
+        assign_capability('moodle/site:sendmessage', CAP_PROHIBIT, $roleid, \core\context\system::instance()->id, true);
+        accesslib_clear_all_caches_for_unit_testing();
+
+        $report = reminder_sender::send_with_report($assign, $users, 'Hi {firstname}', $teacher, reminder_sender::CHANNEL_BOTH);
+        $this->assertSame(['sent' => 2, 'incomplete' => 0, 'chat' => 0, 'chatrefused' => 2], $report);
+        $this->assertSame([], $this->chat_messages($teacher, $anu));
+    }
+
+    /**
+     * An unknown way of sending is a programming error.
+     */
+    public function test_unknown_channel_is_refused(): void {
+        $this->resetAfterTest();
+        [$teacher, $anu, , $assign] = $this->create_assignment_with_students();
+
+        $this->expectException(\coding_exception::class);
+        reminder_sender::send_with_report($assign, [$anu->id => $anu], 'Hi', $teacher, 'telegram');
+    }
 }

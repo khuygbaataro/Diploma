@@ -27,6 +27,23 @@ use local_darimaa\event\reminders_sent;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class reminder_sender {
+    /** @var string A Moodle notification: the bell, and email when the student's settings allow it. */
+    public const CHANNEL_NOTIFICATION = 'notification';
+
+    /** @var string A Moodle chat message from the teacher, which the student can answer. */
+    public const CHANNEL_CHAT = 'chat';
+
+    /** @var string Both a Moodle notification and a Moodle chat message. */
+    public const CHANNEL_BOTH = 'both';
+
+    /** @var string Moodle took the notification and every delivery channel sent it. */
+    public const DELIVERED = 'delivered';
+
+    /** @var string Moodle saved the notification, so it shows in Moodle, but a channel such as email failed. */
+    public const PARTLY_DELIVERED = 'partly';
+
+    /** @var string Moodle did not take the notification at all. */
+    public const NOT_DELIVERED = 'none';
     /**
      * Sends one reminder to each student and logs the action.
      *
@@ -38,9 +55,46 @@ class reminder_sender {
      * @param \stdClass[] $users Full user records of the students to remind.
      * @param string $template The message text written by the teacher.
      * @param \stdClass $from The user who sends the reminders.
-     * @return int Number of reminders that were sent.
+     * @return int Number of students who got the reminder, at least as a Moodle notification.
      */
     public static function send(\assign $assign, array $users, string $template, \stdClass $from): int {
+        return self::send_with_report($assign, $users, $template, $from)['sent'];
+    }
+
+    /**
+     * Sends one reminder to each student, logs the action and says what reached the students.
+     *
+     * The reminder goes as a Moodle notification, as a Moodle chat message from the sender, or both.
+     *
+     * Moodle first saves a notification, which the student then sees in Moodle, and then passes
+     * it to each delivery channel, such as email. When one channel fails, Moodle reports the whole
+     * send as failed, although the notification is saved. Such a reminder counts as sent here, and
+     * also as incomplete, so that nobody sends it again thinking it was lost.
+     *
+     * A chat message only goes where Moodle allows the sender to message the student. Otherwise the
+     * student is counted in chatrefused.
+     *
+     * @param \assign $assign The assignment.
+     * @param \stdClass[] $users Full user records of the students to remind.
+     * @param string $template The message text written by the teacher.
+     * @param \stdClass $from The user who sends the reminders.
+     * @param string $channel One of the CHANNEL_ constants.
+     * @return int[] With sent (students who got the reminder in at least one way), incomplete (students
+     *               whose notification was saved but not sent by every channel, such as email), chat
+     *               (chat messages sent) and chatrefused (students who could not get a chat message).
+     */
+    public static function send_with_report(
+        \assign $assign,
+        array $users,
+        string $template,
+        \stdClass $from,
+        string $channel = self::CHANNEL_NOTIFICATION
+    ): array {
+        global $CFG;
+
+        if (!in_array($channel, [self::CHANNEL_NOTIFICATION, self::CHANNEL_CHAT, self::CHANNEL_BOTH], true)) {
+            throw new \core\exception\coding_exception('Unknown reminder channel: ' . $channel);
+        }
         $cm = $assign->get_course_module();
         $course = $assign->get_course();
         $context = $assign->get_context();
@@ -52,6 +106,9 @@ class reminder_sender {
         $strings = get_string_manager();
 
         $sent = 0;
+        $incomplete = 0;
+        $chat = 0;
+        $chatrefused = 0;
         foreach ($users as $user) {
             // A suspended account, or one that can never log in, gets no reminder.
             if (!course_students::can_log_in($user)) {
@@ -95,7 +152,23 @@ class reminder_sender {
             $message->contexturlname = $assignname;
             $message->courseid = $course->id;
 
-            if (message_send($message)) {
+            $reached = false;
+            if ($channel !== self::CHANNEL_CHAT) {
+                $status = self::delivery_status(message_send($message), $message);
+                $reached = $status !== self::NOT_DELIVERED;
+                if ($status === self::PARTLY_DELIVERED) {
+                    $incomplete++;
+                }
+            }
+            if ($channel !== self::CHANNEL_NOTIFICATION) {
+                if (!empty($CFG->messaging) && self::send_chat($from, $user, $message->fullmessagehtml)) {
+                    $chat++;
+                    $reached = true;
+                } else {
+                    $chatrefused++;
+                }
+            }
+            if ($reached) {
                 $sent++;
             }
         }
@@ -104,10 +177,58 @@ class reminder_sender {
             reminders_sent::create([
                 'context' => $context,
                 'userid' => $from->id,
-                'other' => ['count' => $sent],
+                'other' => ['count' => $sent, 'channel' => $channel],
             ])->trigger();
         }
 
-        return $sent;
+        return ['sent' => $sent, 'incomplete' => $incomplete, 'chat' => $chat, 'chatrefused' => $chatrefused];
+    }
+
+    /**
+     * Says what happened to a notification, from what message_send() returned.
+     *
+     * message_send() returns false when one delivery channel fails, even after Moodle saved the
+     * notification. The saved id tells the two cases apart.
+     *
+     * @param mixed $result What message_send() returned: a message id, or false.
+     * @param \core\message\message $message The message that was sent.
+     * @return string One of DELIVERED, PARTLY_DELIVERED and NOT_DELIVERED.
+     */
+    public static function delivery_status($result, \core\message\message $message): string {
+        if ($result) {
+            return self::DELIVERED;
+        }
+        return empty($message->savedmessageid) ? self::NOT_DELIVERED : self::PARTLY_DELIVERED;
+    }
+
+    /**
+     * Sends the reminder as a Moodle chat message from one user to another.
+     *
+     * Moodle decides whether the sender may message the student: the sender needs the capability to
+     * send messages, and the student's privacy settings and blocked users are respected.
+     *
+     * @param \stdClass $from The sender.
+     * @param \stdClass $to The student.
+     * @param string $html The message, as HTML.
+     * @return bool Whether the message was sent.
+     */
+    private static function send_chat(\stdClass $from, \stdClass $to, string $html): bool {
+        if (!\core_message\api::can_send_message((int) $to->id, (int) $from->id)) {
+            return false;
+        }
+        $userids = [(int) $from->id, (int) $to->id];
+        $conversationid = \core_message\api::get_conversation_between_users($userids);
+        if (!$conversationid) {
+            $conversationid = \core_message\api::create_conversation(
+                \core_message\api::MESSAGE_CONVERSATION_TYPE_INDIVIDUAL,
+                $userids
+            )->id;
+        }
+        try {
+            \core_message\api::send_message_to_conversation((int) $from->id, (int) $conversationid, $html, FORMAT_HTML);
+        } catch (\moodle_exception $exception) {
+            return false;
+        }
+        return true;
     }
 }

@@ -83,7 +83,9 @@ $message = get_config('local_darimaa', 'defaultmessage');
 if (empty($message)) {
     $message = get_string('defaultmessage_text', 'local_darimaa');
 }
-$form = new remind_form($url, ['students' => $students, 'message' => $message]);
+// A reminder may also go as a chat message when Moodle's messaging is on and the teacher may send messages.
+$canchat = !empty($CFG->messaging) && has_capability('moodle/site:sendmessage', \core\context\system::instance());
+$form = new remind_form($url, ['students' => $students, 'message' => $message, 'canchat' => $canchat]);
 
 if ($form->is_cancelled()) {
     redirect($backurl);
@@ -93,9 +95,20 @@ if ($form->is_cancelled()) {
     // Only students who are still missing a submission can be reminded.
     $selected = array_keys(array_filter((array) ($data->users ?? [])));
     $recipients = array_intersect_key($missing, array_flip($selected));
-    $sent = reminder_sender::send($assign, $recipients, $data->message, $USER);
+    $channel = $canchat ? ($data->channel ?? reminder_sender::CHANNEL_NOTIFICATION) : reminder_sender::CHANNEL_NOTIFICATION;
+    $report = reminder_sender::send_with_report($assign, $recipients, $data->message, $USER, $channel);
 
-    redirect($url, get_string('reminderssent', 'local_darimaa', $sent), null, notification::NOTIFY_SUCCESS);
+    // A reminder that reached Moodle but not every channel must not look lost, or it gets sent twice.
+    if ($report['incomplete'] > 0) {
+        $text = get_string('reminderssentincomplete', 'local_darimaa', (object) $report);
+    } else {
+        $text = get_string('reminderssent', 'local_darimaa', $report['sent']);
+    }
+    if ($report['chatrefused'] > 0) {
+        $text .= ' ' . get_string('reminderschatrefused', 'local_darimaa', $report['chatrefused']);
+    }
+    $problem = $report['sent'] === 0 || $report['incomplete'] > 0 || $report['chatrefused'] > 0;
+    redirect($url, $text, null, $problem ? notification::NOTIFY_WARNING : notification::NOTIFY_SUCCESS);
 }
 
 echo $OUTPUT->header();
