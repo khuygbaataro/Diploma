@@ -24,8 +24,8 @@ require_once($CFG->libdir . '/formslib.php');
 /**
  * Form for choosing students and writing the reminder text.
  *
- * Custom data: 'students' (user id => label), 'message' (default text) and 'canchat'
- * (whether the reminder may also go as a Moodle chat message).
+ * Custom data: 'students' (user id => label), 'message' (default text), 'choosechannel'
+ * (whether the teacher chooses how the reminders go) and 'channel' (how they go otherwise).
  *
  * @package    local_darimaa
  * @copyright  2026 Khuygbaatar Ochirkhuyag
@@ -50,8 +50,8 @@ class remind_form extends \moodleform {
         // The last argument is the starting state the "Select all/none" controller gives the checkboxes.
         $this->add_checkbox_controller(1, null, null, 1);
 
-        // The chat is offered only when Moodle's messaging is on and the teacher may send messages.
-        if (!empty($this->_customdata['canchat'])) {
+        // The teacher chooses only when the site setting allows it and chat is possible.
+        if (!empty($this->_customdata['choosechannel'])) {
             $mform->addElement('select', 'channel', get_string('channel', 'local_darimaa'), [
                 \local_darimaa\local\reminder_sender::CHANNEL_NOTIFICATION => get_string('channel_notification', 'local_darimaa'),
                 \local_darimaa\local\reminder_sender::CHANNEL_CHAT => get_string('channel_chat', 'local_darimaa'),
@@ -60,6 +60,13 @@ class remind_form extends \moodleform {
             $mform->setType('channel', PARAM_ALPHA);
             $mform->setDefault('channel', \local_darimaa\local\reminder_sender::CHANNEL_NOTIFICATION);
             $mform->addHelpButton('channel', 'channel', 'local_darimaa');
+        } else if (!empty($this->_customdata['channel'])) {
+            $mform->addElement(
+                'static',
+                'channelinfo',
+                get_string('channel', 'local_darimaa'),
+                get_string('channel_' . $this->_customdata['channel'], 'local_darimaa')
+            );
         }
 
         $mform->addElement('textarea', 'message', get_string('message', 'local_darimaa'), ['rows' => 10, 'cols' => 70]);

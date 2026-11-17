@@ -296,4 +296,30 @@ final class bot_functions_test extends \advanced_testcase {
             array_map(static fn($message) => $message->useridto, $messagesink->get_messages())
         );
     }
+
+    /**
+     * With the site setting on chat, the bot's reminders go as chat messages from the teacher.
+     */
+    public function test_send_reminders_follows_the_channel_setting(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [, $teacher, $students, $cm] = $this->create_course(time() - DAYSECS);
+        $this->link($teacher, 'psid-t');
+        $this->act_as_bot();
+        set_config('reminderchannel', 'chat', 'local_darimaa');
+        $this->redirectMessages();
+
+        $result = $this->call(send_reminders::class, ['messenger', 'psid-t', $cm->id]);
+
+        $this->assertSame(['sent' => 2, 'missing' => 2], $result);
+        $this->assertSame(0, $DB->count_records('notifications', ['component' => 'local_darimaa']));
+        foreach ($students as $student) {
+            $conversationid = \core_message\api::get_conversation_between_users([$teacher->id, $student->id]);
+            $this->assertNotFalse($conversationid);
+            $this->assertSame(1, $DB->count_records('messages', [
+                'conversationid' => $conversationid,
+                'useridfrom' => $teacher->id,
+            ]));
+        }
+    }
 }

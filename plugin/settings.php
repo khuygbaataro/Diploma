@@ -37,6 +37,19 @@ if ($hassiteconfig) {
             PARAM_TEXT
         ));
 
+        $settings->add(new admin_setting_configselect(
+            'local_darimaa/reminderchannel',
+            new lang_string('reminderchannel', 'local_darimaa'),
+            new lang_string('reminderchannel_desc', 'local_darimaa'),
+            'teacher',
+            [
+                'teacher' => new lang_string('reminderchannel_teacher', 'local_darimaa'),
+                'chat' => new lang_string('reminderchannel_chat', 'local_darimaa'),
+                'notification' => new lang_string('reminderchannel_notification', 'local_darimaa'),
+                'both' => new lang_string('reminderchannel_both', 'local_darimaa'),
+            ]
+        ));
+
         $settings->add(new admin_setting_configtext(
             'local_darimaa/messengerlink',
             new lang_string('messengerlink', 'local_darimaa'),

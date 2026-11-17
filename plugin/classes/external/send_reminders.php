@@ -97,7 +97,9 @@ class send_reminders extends bot_function {
             $template = get_string('defaultmessage_text', 'local_darimaa');
         }
 
-        $sent = $missing ? reminder_sender::send($assign, $missing, $template, $teacher) : 0;
+        // The site setting decides how the reminders go; the bot offers no choice.
+        $way = reminder_sender::resolve_channel(null, reminder_sender::can_chat($teacher));
+        $sent = $missing ? reminder_sender::send_with_report($assign, $missing, $template, $teacher, $way)['sent'] : 0;
 
         return ['sent' => $sent, 'missing' => count($missing)];
     }

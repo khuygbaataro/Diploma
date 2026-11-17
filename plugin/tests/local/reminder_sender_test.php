@@ -271,4 +271,82 @@ final class reminder_sender_test extends \advanced_testcase {
         $this->expectException(\coding_exception::class);
         reminder_sender::send_with_report($assign, [$anu->id => $anu], 'Hi', $teacher, 'telegram');
     }
+
+    /**
+     * The site setting decides how a reminder goes, and a notification goes when chat is not possible.
+     */
+    public function test_resolve_channel_follows_the_site_setting(): void {
+        $this->resetAfterTest();
+        $notification = reminder_sender::CHANNEL_NOTIFICATION;
+        $chat = reminder_sender::CHANNEL_CHAT;
+        $both = reminder_sender::CHANNEL_BOTH;
+
+        // By default the teacher chooses, and a notification goes when they choose nothing.
+        $this->assertSame(reminder_sender::CHANNEL_TEACHER, reminder_sender::get_channel_setting());
+        $this->assertSame($chat, reminder_sender::resolve_channel($chat, true));
+        $this->assertSame($both, reminder_sender::resolve_channel($both, true));
+        $this->assertSame($notification, reminder_sender::resolve_channel(null, true));
+        $this->assertSame($notification, reminder_sender::resolve_channel('telegram', true));
+        $this->assertSame($notification, reminder_sender::resolve_channel($chat, false));
+
+        // A fixed setting wins over the teacher's choice.
+        set_config('reminderchannel', $chat, 'local_darimaa');
+        $this->assertSame($chat, reminder_sender::resolve_channel($notification, true));
+        $this->assertSame($chat, reminder_sender::resolve_channel(null, true));
+        // When chat is not possible, the reminder still reaches the students, as a notification.
+        $this->assertSame($notification, reminder_sender::resolve_channel(null, false));
+
+        set_config('reminderchannel', $both, 'local_darimaa');
+        $this->assertSame($both, reminder_sender::resolve_channel($chat, true));
+        set_config('reminderchannel', $notification, 'local_darimaa');
+        $this->assertSame($notification, reminder_sender::resolve_channel($chat, true));
+
+        // An unknown value counts as the teacher choosing.
+        set_config('reminderchannel', 'fax', 'local_darimaa');
+        $this->assertSame(reminder_sender::CHANNEL_TEACHER, reminder_sender::get_channel_setting());
+    }
+
+    /**
+     * Chat needs site messaging and the capability to send messages.
+     */
+    public function test_can_chat_needs_messaging_and_the_capability(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$teacher] = $this->create_assignment_with_students();
+
+        $this->assertTrue(reminder_sender::can_chat($teacher));
+
+        set_config('messaging', 0);
+        $this->assertFalse(reminder_sender::can_chat($teacher));
+
+        set_config('messaging', 1);
+        $roleid = $DB->get_field('role', 'id', ['shortname' => 'user'], MUST_EXIST);
+        assign_capability('moodle/site:sendmessage', CAP_PROHIBIT, $roleid, \core\context\system::instance()->id, true);
+        accesslib_clear_all_caches_for_unit_testing();
+        $this->assertFalse(reminder_sender::can_chat($teacher));
+    }
+
+    /**
+     * The settings page offers the four ways, with the teacher's choice as the default.
+     */
+    public function test_settings_page_offers_the_reminder_channel(): void {
+        global $CFG;
+        require_once($CFG->libdir . '/adminlib.php');
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $settings = [];
+        foreach (admin_get_root(true, true)->locate('local_darimaa')->settings as $setting) {
+            $settings[$setting->name] = $setting;
+        }
+        $this->assertArrayHasKey('reminderchannel', $settings);
+        $this->assertSame(reminder_sender::CHANNEL_TEACHER, $settings['reminderchannel']->get_defaultsetting());
+        $settings['reminderchannel']->load_choices();
+        $this->assertEqualsCanonicalizing([
+            reminder_sender::CHANNEL_TEACHER,
+            reminder_sender::CHANNEL_NOTIFICATION,
+            reminder_sender::CHANNEL_CHAT,
+            reminder_sender::CHANNEL_BOTH,
+        ], array_keys($settings['reminderchannel']->choices));
+    }
 }

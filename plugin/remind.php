@@ -83,9 +83,15 @@ $message = get_config('local_darimaa', 'defaultmessage');
 if (empty($message)) {
     $message = get_string('defaultmessage_text', 'local_darimaa');
 }
-// A reminder may also go as a chat message when Moodle's messaging is on and the teacher may send messages.
-$canchat = !empty($CFG->messaging) && has_capability('moodle/site:sendmessage', \core\context\system::instance());
-$form = new remind_form($url, ['students' => $students, 'message' => $message, 'canchat' => $canchat]);
+// The site setting decides how reminders go, or lets the teacher choose when chat is possible.
+$canchat = reminder_sender::can_chat($USER);
+$choosechannel = $canchat && reminder_sender::get_channel_setting() === reminder_sender::CHANNEL_TEACHER;
+$form = new remind_form($url, [
+    'students' => $students,
+    'message' => $message,
+    'choosechannel' => $choosechannel,
+    'channel' => reminder_sender::resolve_channel(null, $canchat),
+]);
 
 if ($form->is_cancelled()) {
     redirect($backurl);
@@ -95,7 +101,7 @@ if ($form->is_cancelled()) {
     // Only students who are still missing a submission can be reminded.
     $selected = array_keys(array_filter((array) ($data->users ?? [])));
     $recipients = array_intersect_key($missing, array_flip($selected));
-    $channel = $canchat ? ($data->channel ?? reminder_sender::CHANNEL_NOTIFICATION) : reminder_sender::CHANNEL_NOTIFICATION;
+    $channel = reminder_sender::resolve_channel($choosechannel ? ($data->channel ?? null) : null, $canchat);
     $report = reminder_sender::send_with_report($assign, $recipients, $data->message, $USER, $channel);
 
     // A reminder that reached Moodle but not every channel must not look lost, or it gets sent twice.

@@ -36,6 +36,9 @@ class reminder_sender {
     /** @var string Both a Moodle notification and a Moodle chat message. */
     public const CHANNEL_BOTH = 'both';
 
+    /** @var string Setting value: the teacher chooses the way on the reminder page. */
+    public const CHANNEL_TEACHER = 'teacher';
+
     /** @var string Moodle took the notification and every delivery channel sent it. */
     public const DELIVERED = 'delivered';
 
@@ -182,6 +185,54 @@ class reminder_sender {
         }
 
         return ['sent' => $sent, 'incomplete' => $incomplete, 'chat' => $chat, 'chatrefused' => $chatrefused];
+    }
+
+    /**
+     * Returns the site setting for how reminders are sent.
+     *
+     * @return string CHANNEL_TEACHER, or one of the ways a reminder can go.
+     */
+    public static function get_channel_setting(): string {
+        $value = (string) get_config('local_darimaa', 'reminderchannel');
+        $known = [self::CHANNEL_TEACHER, self::CHANNEL_NOTIFICATION, self::CHANNEL_CHAT, self::CHANNEL_BOTH];
+        return in_array($value, $known, true) ? $value : self::CHANNEL_TEACHER;
+    }
+
+    /**
+     * Whether a user may send reminders as Moodle chat messages.
+     *
+     * Moodle's messaging must be on for the site, and the user must be allowed to send messages.
+     *
+     * @param \stdClass $user The sender.
+     * @return bool
+     */
+    public static function can_chat(\stdClass $user): bool {
+        global $CFG;
+
+        return !empty($CFG->messaging)
+            && has_capability('moodle/site:sendmessage', \core\context\system::instance(), $user);
+    }
+
+    /**
+     * Decides how a reminder goes, from the site setting and what the teacher chose.
+     *
+     * When the setting leaves the choice to the teacher, their choice counts, and a notification
+     * when they chose nothing. Otherwise the setting decides. When chat is not possible for the
+     * sender, the reminder goes as a notification, so that it still reaches the students.
+     *
+     * @param string|null $chosen What the teacher chose on the reminder page, if anything.
+     * @param bool $canchat Whether the sender may send chat messages.
+     * @return string CHANNEL_NOTIFICATION, CHANNEL_CHAT or CHANNEL_BOTH.
+     */
+    public static function resolve_channel(?string $chosen, bool $canchat): string {
+        $ways = [self::CHANNEL_NOTIFICATION, self::CHANNEL_CHAT, self::CHANNEL_BOTH];
+        $setting = self::get_channel_setting();
+        if ($setting === self::CHANNEL_TEACHER) {
+            $channel = in_array($chosen, $ways, true) ? $chosen : self::CHANNEL_NOTIFICATION;
+        } else {
+            $channel = $setting;
+        }
+        return $canchat ? $channel : self::CHANNEL_NOTIFICATION;
     }
 
     /**
