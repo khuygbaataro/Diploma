@@ -24,6 +24,7 @@ use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use core_privacy\tests\provider_testcase;
+use local_darimaa\external\get_attention;
 use local_darimaa\external\get_inactive_students;
 use local_darimaa\external\get_quiz_topic_results;
 use local_darimaa\external\get_user;
@@ -95,8 +96,12 @@ final class provider_test extends provider_testcase {
             'percent' => 'quizmarks',
             'ungraded' => 'quizmarks',
             'topics' => 'quizmarks',
+            'notattempted' => 'quizmarks',
+            'quizaverage' => 'quizmarks',
+            'weaktopics' => 'quizmarks',
+            'signals' => 'courseactivity',
         ];
-        foreach ([get_inactive_students::class, get_quiz_topic_results::class] as $function) {
+        foreach ([get_inactive_students::class, get_quiz_topic_results::class, get_attention::class] as $function) {
             foreach (array_keys($function::execute_returns()->keys['students']->content->keys) as $field) {
                 $this->assertArrayHasKey($field, $declaredas, $function);
                 $this->assertContains($declaredas[$field], $botfields, $field);

@@ -79,6 +79,12 @@ $functions = [
         'type' => 'read',
         'capabilities' => 'local/darimaa:botaccess',
     ],
+    'local_darimaa_get_attention' => [
+        'classname' => \local_darimaa\external\get_attention::class,
+        'description' => 'Shows a linked teacher the students of a course who need attention, with the reasons.',
+        'type' => 'read',
+        'capabilities' => 'local/darimaa:botaccess',
+    ],
 ];
 
 $services = [
@@ -94,6 +100,7 @@ $services = [
             'local_darimaa_get_courses',
             'local_darimaa_get_inactive_students',
             'local_darimaa_get_quiz_topic_results',
+            'local_darimaa_get_attention',
         ],
         'requiredcapability' => 'local/darimaa:botaccess',
         'restrictedusers' => 0,
