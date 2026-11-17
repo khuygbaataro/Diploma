@@ -27,6 +27,9 @@ functions. The technical name of the plugin is `local_darimaa`.
 - **Web service functions for the bot** (0.2): a student's open work from the calendar, a teacher's
   assignments with missing submissions, and sending reminders in the teacher's name. The bot only
   gets data for accounts their owners have linked.
+- **Students who need attention** (0.4): a page in the course menu that lists the students with
+  warning signs (never visited, away for days, missing assignments, skipped or weak quizzes), with
+  the reasons. Read-only.
 - **Reports for teachers** (0.3): three read-only web service functions for the bot. A linked
   teacher can get their courses and quizzes, the inactive students of a course, and the results of
   a quiz by topic. They send no messages and change nothing in Moodle. See

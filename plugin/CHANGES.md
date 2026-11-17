@@ -1,5 +1,21 @@
 # Changes
 
+## 0.4.0 (2026-11-18)
+
+A page in Moodle that shows which students may need the teacher's attention, and why. Read-only:
+nothing is sent and nothing changes. No database changes; the web service functions keep their
+parameters and replies.
+
+- New page "Students who need attention" in the course menu, for teachers who can send reminders
+  and see the participants. Each student gets a warning sign for: never visited the course, no
+  visit for 7, 14 or 30 days (the teacher picks), an assignment past its due date and not
+  submitted, a closed quiz not attempted, a quiz average below 60%, or a quiz topic below 60%.
+- The page shows the student code and name, last visit, estimated time in the course, missing
+  assignments, skipped quizzes, quiz average and weak topics. Students with the most signs come
+  first. The signs are hints for a conversation; there is no hidden score.
+- Separate groups, the hidden "last access" field, report access to each quiz and accounts that
+  cannot log in are respected, as in the other reports.
+
 ## 0.3.3 (2026-11-18)
 
 A site setting decides how reminders are sent. No database changes, and the web service functions
