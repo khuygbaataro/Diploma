@@ -25,16 +25,18 @@ MAX_ASSIGNMENTS = 10
 MAX_STUDENTS = 15
 MAX_CHOICES = 10
 INACTIVE_DAYS = 7
+ATTENTION_DAYS = 7
 
 # The teacher reports start with a course. Each one continues with this payload plus the course id.
-COURSE_STEPS = {"INACTIVE": "INACTIVE_COURSE", "QUIZ": "QUIZ_COURSE"}
+COURSE_STEPS = {"ATTENTION": "ATTENTION_COURSE", "INACTIVE": "INACTIVE_COURSE", "QUIZ": "QUIZ_COURSE"}
 
 # Checked in this order. Short words must match as whole words, longer ones anywhere.
 KEYWORDS: list[tuple[str, list[str]]] = [
     ("UNLINK", ["салгах", "салга", "salgah", "unlink"]),
     ("OVERDUE", ["хоцорсон", "хоцорч", "хэтэрсэн", "hotsorson", "hocorson", "overdue"]),
     ("MISSING", ["илгээгээгүй", "сануулга", "ilgeegeegui", "sanuulga", "missing"]),
-    # The two teacher reports come before PLAN, so that «Сорилын хугацаа» asks about a quiz.
+    # The teacher reports come before PLAN, so that «Сорилын хугацаа» asks about a quiz.
+    ("ATTENTION", ["анхаарах", "анхаарал", "асуудалтай", "anhaarah", "anhaaral", "asuudaltai", "attention"]),
     ("INACTIVE", ["идэвхгүй", "идэвхигүй", "idevhgui", "idewhgui", "inactive"]),
     ("QUIZ", ["сорил", "сул сэдэв", "soril", "sul sedev", "quiz"]),
     ("PLAN", [
@@ -50,7 +52,17 @@ KEYWORDS: list[tuple[str, list[str]]] = [
 ERROR_TEXTS = {
     "nopermissions": texts.NO_PERMISSION,
     "unsupportedanonymous": texts.ANONYMOUS,
+    # The function is not in the bot's service yet: the plugin is older than the bot.
+    "accessexception": texts.PLUGIN_TOO_OLD,
 }
+
+
+def error_text(error: MoodleError) -> str:
+    """What the user is told when Moodle refuses a request."""
+    # Moodle does not know the function at all: the plugin is older than the bot.
+    if error.errorcode == "invalidrecord" and "external_functions" in error.message:
+        return texts.PLUGIN_TOO_OLD
+    return ERROR_TEXTS.get(error.errorcode, texts.ERROR)
 
 
 def extract_code(text: str) -> str:
@@ -109,7 +121,7 @@ class Bot:
             replies = await self.respond(event)
         except MoodleError as error:
             log.warning("Moodle refused a request for account %s: %s", account_ref(event.sender_id), error)
-            replies = [Reply(ERROR_TEXTS.get(error.errorcode, texts.ERROR))]
+            replies = [Reply(error_text(error))]
         except httpx.HTTPError as error:
             log.error("Could not reach Moodle: %s", error)
             replies = [Reply(texts.ERROR)]
@@ -164,6 +176,8 @@ class Bot:
             if not user.get("isteacher"):
                 return await self.plan(sender, user)
             return await self.choose_course(sender, user, name)
+        if name == "ATTENTION_COURSE" and argument.isdigit():
+            return await self.attention(sender, user, int(argument))
         if name == "INACTIVE_COURSE" and argument.isdigit():
             return await self.inactive(sender, user, int(argument))
         if name == "QUIZ_COURSE" and argument.isdigit():
@@ -283,6 +297,8 @@ class Bot:
             return [Reply(texts.COURSES_NONE, self.menu(user))]
         if len(courses) == 1:
             courseid = int(courses[0]["id"])
+            if report == "ATTENTION":
+                return await self.attention(sender, user, courseid)
             if report == "INACTIVE":
                 return await self.inactive(sender, user, courseid)
             return await self.choose_quiz(sender, user, courseid)
@@ -296,6 +312,55 @@ class Bot:
             lines.append(texts.COURSE_MORE.format(count=len(courses) - MAX_CHOICES))
         lines += ["", texts.COURSE_PICK]
         return [Reply("\n".join(lines), choices + [(texts.NO, "CANCEL")])]
+
+    async def attention(self, sender: str, user: dict[str, Any], courseid: int) -> list[Reply]:
+        """Shows a teacher the students of one course who need attention, and why. Nothing is sent to them."""
+        if not user.get("isteacher"):
+            return [Reply(texts.NO_PERMISSION, self.menu(user))]
+        data = await self.moodle.get_attention(sender, courseid, days=ATTENTION_DAYS)
+        if not data.get("linked"):
+            return [Reply(texts.not_linked(user.get("linkurl", "")))]
+
+        course = data.get("coursename", "")
+        total = int(data.get("total", 0))
+        students = data.get("students", [])
+        if not students:
+            lines = [texts.ATTENTION_EMPTY.format(course=course, total=total)]
+        else:
+            lines = [texts.ATTENTION_HEADER.format(course=course, count=len(students), total=total)]
+            for student in students[:MAX_STUDENTS]:
+                lines.append(texts.ATTENTION_LINE.format(
+                    student=self.student_label(student),
+                    reasons="; ".join(self.reasons(student)),
+                ))
+            if len(students) > MAX_STUDENTS:
+                lines.append(texts.ATTENTION_MORE.format(count=len(students) - MAX_STUDENTS))
+            lines += ["", texts.ATTENTION_NOTE]
+        if not data.get("lastaccessavailable", True):
+            lines.append(texts.ATTENTION_HIDDEN)
+        return [Reply("\n".join(lines), self.menu(user))]
+
+    def reasons(self, student: dict[str, Any]) -> list[str]:
+        """The warning signs of one student in words, in the order Moodle gave them."""
+        words: list[str] = []
+        for signal in student.get("signals", []):
+            if signal == "never":
+                words.append(texts.REASON_NEVER)
+            elif signal == "inactive":
+                words.append(texts.REASON_INACTIVE.format(days=student.get("dayssince", 0)))
+            elif signal == "missing":
+                words.append(texts.REASON_MISSING.format(count=student.get("missing", 0)))
+            elif signal == "notattempted":
+                words.append(texts.REASON_NOTATTEMPTED.format(count=student.get("notattempted", 0)))
+            elif signal == "lowquiz":
+                words.append(texts.REASON_LOWQUIZ.format(percent=self.number(student.get("quizaverage", 0))))
+            elif signal == "weaktopic":
+                topics = sorted(student.get("weaktopics", []), key=lambda topic: (float(topic["percent"]), topic["name"]))
+                words.append(texts.REASON_WEAKTOPIC.format(topics=", ".join(
+                    texts.QUIZ_WEAK_TOPIC.format(name=topic["name"], percent=self.number(topic["percent"]))
+                    for topic in topics
+                )))
+        return words
 
     async def inactive(self, sender: str, user: dict[str, Any], courseid: int) -> list[Reply]:
         """Shows a teacher the inactive students of one course. Nothing is sent to the students."""
@@ -419,6 +484,7 @@ class Bot:
         choices = [(texts.MENU_PLAN, "PLAN"), (texts.MENU_OVERDUE, "OVERDUE")]
         if user.get("isteacher"):
             choices.append((texts.MENU_MISSING, "MISSING"))
+            choices.append((texts.MENU_ATTENTION, "ATTENTION"))
             choices.append((texts.MENU_INACTIVE, "INACTIVE"))
             choices.append((texts.MENU_QUIZ, "QUIZ"))
         choices.append((texts.MENU_HELP, "HELP"))

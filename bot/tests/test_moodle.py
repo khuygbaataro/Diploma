@@ -8,7 +8,7 @@ import pytest
 
 from darimaa_bot.moodle import MoodleClient, MoodleError
 
-from .fakes import FakeMoodle, course, quiz
+from .fakes import FakeMoodle, attention_student, course, quiz
 
 
 def call(method: str, *args, reply=None, **kwargs):
@@ -49,6 +49,10 @@ def test_teacher_report_functions_send_the_right_parameters():
     assert sent["wsfunction"] == "local_darimaa_get_quiz_topic_results"
     assert (sent["channel"], sent["externalid"], sent["cmid"]) == ("messenger", "psid-t", "345")
 
+    _, sent = call("get_attention", "psid-t", 12)
+    assert sent["wsfunction"] == "local_darimaa_get_attention"
+    assert (sent["channel"], sent["externalid"], sent["courseid"], sent["days"]) == ("messenger", "psid-t", "12", "7")
+
 
 def test_moodle_errors_are_raised_with_their_code():
     reply = {"exception": "required_capability_exception", "errorcode": "nopermissions", "message": "No permission"}
@@ -76,8 +80,14 @@ def test_fakes_answer_like_the_plugin():
     assert list(results) == ["linked", "quizname", "coursename", "topicsource", "notattempted", "topics", "students"]
     assert (results["quizname"], results["coursename"]) == ("Эс", "Биологи 101")
 
+    attention = asyncio.run(moodle.get_attention("psid-t", 12))
+    assert list(attention) == ["linked", "coursename", "days", "lastaccessavailable", "quizzes", "total", "students"]
+    assert list(attention_student("B1", "Ану", ["never"])) == [
+        "code", "fullname", "dayssince", "missing", "notattempted", "quizaverage", "weaktopics", "signals"]
+
     # Like Moodle, the fake refuses a course or quiz the user does not teach.
-    for refused in (moodle.get_inactive_students("psid-t", 99), moodle.get_quiz_topic_results("psid-t", 99)):
+    for refused in (moodle.get_inactive_students("psid-t", 99), moodle.get_quiz_topic_results("psid-t", 99),
+                    moodle.get_attention("psid-t", 99)):
         with pytest.raises(MoodleError) as error:
             asyncio.run(refused)
         assert error.value.errorcode == "nopermissions"

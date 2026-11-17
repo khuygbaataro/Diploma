@@ -95,3 +95,15 @@ class MoodleClient:
             externalid=externalid,
             cmid=cmid,
         )
+
+    # Needs plugin 0.4.1 or later. It only reads data.
+
+    async def get_attention(self, externalid: str, courseid: int, days: int = 7) -> dict[str, Any]:
+        """The students of one course who need attention, with the reasons."""
+        return await self.call(
+            "local_darimaa_get_attention",
+            channel=self.channel,
+            externalid=externalid,
+            courseid=courseid,
+            days=days,
+        )

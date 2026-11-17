@@ -29,6 +29,9 @@ class FakeMoodle:
         self.inactive: dict[int, dict[str, Any]] = {}
         self.quiz_results: dict[int, dict[str, Any]] = {}
         self.inactive_days: list[int] = []
+        # The attention list (plugin 0.4.1), by course id.
+        self.attention: dict[int, dict[str, Any]] = {}
+        self.attention_days: list[int] = []
 
     async def get_user(self, externalid: str) -> dict[str, Any]:
         self.calls.append("get_user")
@@ -97,6 +100,16 @@ class FakeMoodle:
                 "topicsource": "categories", "notattempted": 0, "topics": [],
                 "students": []} | self.quiz_results.get(cmid, {})
 
+    async def get_attention(self, externalid: str, courseid: int, days: int = 7) -> dict[str, Any]:
+        self.calls.append("get_attention")
+        userid = self.links.get(externalid)
+        names = {row["id"]: row["fullname"] for row in self.courses.get(userid, [])}
+        if courseid not in names:
+            raise MoodleError("nopermissions", "Sorry, but you do not currently have permissions to do that")
+        self.attention_days.append(days)
+        return {"linked": True, "coursename": names[courseid], "days": days, "lastaccessavailable": True,
+                "quizzes": 0, "total": 0, "students": []} | self.attention.get(courseid, {})
+
 
 def course(courseid: int, fullname: str, students: int = 0, quizzes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """One row of get_courses."""
@@ -122,6 +135,16 @@ def quiz_student(code: str, fullname: str, percent: float, topics: dict[str, flo
     return {"code": code, "fullname": fullname, "percent": percent, "ungraded": ungraded,
             "topics": [{"name": name, "mark": value / 10, "maxmark": 10, "percent": value}
                        for name, value in topics.items()]}
+
+
+def attention_student(code: str, fullname: str, signals: list[str], dayssince: int = -1, missing: int = 0,
+                      notattempted: int = 0, quizaverage: float = -1.0,
+                      weaktopics: dict[str, float] | None = None) -> dict[str, Any]:
+    """One student row of get_attention."""
+    return {"code": code, "fullname": fullname, "dayssince": dayssince, "missing": missing,
+            "notattempted": notattempted, "quizaverage": quizaverage,
+            "weaktopics": [{"name": name, "percent": value} for name, value in (weaktopics or {}).items()],
+            "signals": signals}
 
 
 class FakeMessenger:

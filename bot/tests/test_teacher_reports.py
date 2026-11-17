@@ -378,11 +378,11 @@ def test_student_who_taps_a_report_gets_their_own_plan(setup):
     bot, moodle, messenger = setup
     biology_with_quizzes(moodle)
 
-    for number, report in enumerate(("INACTIVE", "QUIZ")):
+    for number, report in enumerate(("ATTENTION", "INACTIVE", "QUIZ")):
         run(bot.handle(tap(STUDENT, report, f"k{number}")))
         assert messenger.last().text.startswith("Ойрын 7 хоногт хийх ажил алга")
     assert "get_courses" not in moodle.calls
-    assert moodle.calls.count("get_deadlines") == 2
+    assert moodle.calls.count("get_deadlines") == 3
 
 
 # Asking in words.
@@ -433,7 +433,7 @@ def test_student_who_asks_in_words_gets_no_teacher_data(setup):
     moodle.links["psid-other-teacher"] = 9
     moodle.inactive[12] = {"students": [inactive_student("B200910003", "Саруул Тэмүүлэн", dayssince=-1)]}
 
-    for number, words in enumerate(("идэвхгүй оюутнууд", "Сорил 1-ийн дүн", "сул сэдэв")):
+    for number, words in enumerate(("идэвхгүй оюутнууд", "Сорил 1-ийн дүн", "сул сэдэв", "асуудалтай оюутан")):
         run(bot.handle(text(STUDENT, words, f"k{number}")))
         # The student gets the same answer as for their plan.
         assert messenger.last().text.startswith("Ойрын 7 хоногт хийх ажил алга")
@@ -441,13 +441,13 @@ def test_student_who_asks_in_words_gets_no_teacher_data(setup):
     everything = " ".join(messenger.texts())
     for private in ("Саруул", "B2009", "Биологи 101", "Сорил 1"):
         assert private not in everything
-    assert not {"get_courses", "get_inactive_students", "get_quiz_topic_results"} & set(moodle.calls)
+    assert not {"get_courses", "get_inactive_students", "get_quiz_topic_results", "get_attention"} & set(moodle.calls)
 
 
 # Menu and help.
 
 
-def test_teachers_get_the_two_reports_in_menu_and_help(setup):
+def test_teachers_get_the_reports_in_menu_and_help(setup):
     bot, moodle, messenger = setup
 
     run(bot.handle(tap(TEACHER, "HELP", "k1")))
@@ -456,10 +456,12 @@ def test_teachers_get_the_two_reports_in_menu_and_help(setup):
         ("7 хоногийн ажил", "PLAN"),
         ("Хоцорсон ажил", "OVERDUE"),
         ("Илгээгээгүй", "MISSING"),
+        ("Анхаарах оюутан", "ATTENTION"),
         ("Идэвхгүй оюутан", "INACTIVE"),
         ("Сорилын дүн", "QUIZ"),
         ("Тусламж", "HELP"),
     ]
+    assert "• «Анхаарах оюутан»: хичээлдээ ороогүй, даалгавар дутуу, сорил сул оюутнууд, шалтгаантай нь" in reply.text
     assert "• «Идэвхгүй оюутан»: хичээлдээ сүүлийн 7 хоногт ороогүй оюутнууд" in reply.text
     assert "• «Сорилын дүн»: сорилын дүн сэдэв тус бүрээр, сул сэдэвтэй оюутнууд" in reply.text
 
@@ -469,6 +471,7 @@ def test_teachers_get_the_two_reports_in_menu_and_help(setup):
     assert [payload for _, payload in reply.quick_replies] == ["PLAN", "OVERDUE", "HELP"]
     assert "Идэвхгүй" not in reply.text
     assert "Сорилын дүн" not in reply.text
+    assert "Анхаарах" not in reply.text
 
 
 def test_quick_reply_titles_fit_in_twenty_characters(setup):
@@ -477,6 +480,7 @@ def test_quick_reply_titles_fit_in_twenty_characters(setup):
     titles += [texts.YES_SEND, texts.YES_UNLINK, texts.NO]
     assert all(len(title) <= 20 for title in titles), titles
     # The menu words lead to the reports when a teacher types them instead of tapping.
+    assert intent(texts.MENU_ATTENTION) == "ATTENTION"
     assert intent(texts.MENU_INACTIVE) == "INACTIVE"
     assert intent(texts.MENU_QUIZ) == "QUIZ"
 
@@ -484,13 +488,14 @@ def test_quick_reply_titles_fit_in_twenty_characters(setup):
 # Release.
 
 
-def test_release_is_0_3_0_and_the_readme_names_what_is_new():
+def test_release_is_0_4_0_and_the_readme_names_what_is_new():
     from pathlib import Path
 
     import darimaa_bot
 
-    assert darimaa_bot.__version__ == "0.3.0"
+    assert darimaa_bot.__version__ == "0.4.0"
     readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
-    for needed in ("0.3.0", "WEAK_TOPIC_BELOW", "EXAM_POINTS", texts.MENU_INACTIVE, texts.MENU_QUIZ,
-                   "local_darimaa_get_inactive_students", "local_darimaa_get_quiz_topic_results"):
+    for needed in ("0.4.0", "0.4.1", "WEAK_TOPIC_BELOW", "EXAM_POINTS", texts.MENU_ATTENTION, texts.MENU_INACTIVE,
+                   texts.MENU_QUIZ, "local_darimaa_get_attention", "local_darimaa_get_inactive_students",
+                   "local_darimaa_get_quiz_topic_results"):
         assert needed in readme, needed
