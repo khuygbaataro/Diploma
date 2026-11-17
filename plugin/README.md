@@ -56,6 +56,9 @@ functions. The technical name of the plugin is `local_darimaa`.
 *Site administration > Plugins > Local plugins > Teacher & Student Assistant*
 
 - **Default reminder message**: the text teachers start from. The bot sends this text as it is.
+- **How reminders are sent** (0.3.3): the teacher chooses each time (default), or always as a Moodle
+  chat message from the teacher, always as a Moodle notification, or always both. When chat is not
+  possible the reminders go as notifications. Reminders sent by the bot follow this setting too.
 - **Messenger link**: the `m.me` link of the bot's Facebook Page, used for the "Open Messenger" button.
 - **Student code field** (0.3): the user field that holds the student code teachers know a student
   by. Choices: username (default), ID number, or any custom profile field. The reports for

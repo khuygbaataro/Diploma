@@ -1,5 +1,18 @@
 # Changes
 
+## 0.3.3 (2026-11-18)
+
+A site setting decides how reminders are sent. No database changes, and the web service functions
+keep their parameters and replies.
+
+- New setting "How reminders are sent": the teacher chooses each time (default, as in 0.3.2),
+  always as a Moodle chat message from the teacher, always as a Moodle notification, or always
+  both. With a fixed choice the reminder page shows how the reminders will go instead of a choice.
+- When chat is not possible (site messaging is off, or the teacher may not send messages), the
+  reminders go as notifications, so that they still reach the students.
+- Reminders sent through the assistant bot follow the setting too. With "The teacher chooses each
+  time" they go as notifications, as before.
+
 ## 0.3.2 (2026-11-18)
 
 Reminders can go as Moodle chat messages, and the reminder count tells the truth when email fails.
