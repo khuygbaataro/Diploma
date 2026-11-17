@@ -29,7 +29,7 @@ functions. The technical name of the plugin is `local_darimaa`.
   gets data for accounts their owners have linked.
 - **Students who need attention** (0.4): a page in the course menu that lists the students with
   warning signs (never visited, away for days, missing assignments, skipped or weak quizzes), with
-  the reasons. Read-only.
+  the reasons. Read-only. Since 0.4.1 the bot can show the same list in the chat.
 - **Reports for teachers** (0.3): three read-only web service functions for the bot. A linked
   teacher can get their courses and quizzes, the inactive students of a course, and the results of
   a quiz by topic. They send no messages and change nothing in Moodle. See
@@ -100,7 +100,7 @@ the bot's settings. Running it again reuses what exists; `--newtoken` replaces t
 
 ## Web service functions
 
-The service "Darimaa bot" (`local_darimaa_bot`) has nine functions. All of them need the bot's
+The service "Darimaa bot" (`local_darimaa_bot`) has ten functions. All of them need the bot's
 token and the capability `local/darimaa:botaccess`, and all take `channel` (for example
 `messenger`) and `externalid` (the account id the chat app gave the user). Permissions are always
 checked for the Moodle user linked to that chat account, never for the bot's own account. When
@@ -117,6 +117,7 @@ the chat account is not linked, the reply has `linked: false` and no data.
 | `local_darimaa_get_courses` | read | (0.3) A teacher's courses and quizzes |
 | `local_darimaa_get_inactive_students` | read | (0.3) Last access, time spent and missing work of each student |
 | `local_darimaa_get_quiz_topic_results` | read | (0.3) Quiz results by topic |
+| `local_darimaa_get_attention` | read | (0.4.1) Students who need attention, with the reasons |
 
 The examples below use placeholders: put your own site address in place of `moodle.example.com`,
 the bot's token in place of `BOT-TOKEN`, and a linked teacher's chat account id in place of
@@ -224,6 +225,39 @@ curl -s https://moodle.example.com/webservice/rest/server.php \
   percentage of the students who attempted.
 - The quiz's separate groups mode is respected in the same way as for inactive students.
 
+### local_darimaa_get_attention
+
+Parameters: `courseid`, and `days` (default 7, from 1 to 365): a student with no course access for
+this many days is away. The linked user needs `moodle/course:viewparticipants` and
+`local/darimaa:sendreminders` in the course, as for the "Students who need attention" page.
+
+```bash
+curl -s https://moodle.example.com/webservice/rest/server.php   -d wstoken=BOT-TOKEN -d moodlewsrestformat=json   -d wsfunction=local_darimaa_get_attention   -d channel=messenger -d externalid=CHAT-ACCOUNT-ID   -d courseid=12 -d days=7
+```
+
+```json
+{
+  "linked": true, "coursename": "Biology 101", "days": 7,
+  "lastaccessavailable": true, "quizzes": 2, "total": 25,
+  "students": [
+    {"code": "B200910003", "fullname": "Saraa Tsetseg", "dayssince": 10, "missing": 2,
+     "notattempted": 1, "quizaverage": 45.0,
+     "weaktopics": [{"name": "Cell structure", "percent": 30.0}],
+     "signals": ["inactive", "missing", "notattempted", "lowquiz", "weaktopic"]}
+  ]
+}
+```
+
+- Only students with at least one sign are listed, those with the most signs first. `total` is
+  the number of students looked at.
+- The signs are `never` (never opened the course), `inactive` (away for `days` days), `missing`
+  (an assignment past its due date and not submitted), `notattempted` (a closed quiz not
+  attempted), `lowquiz` (quiz average below 60%) and `weaktopic` (a quiz topic below 60%).
+- `dayssince` is -1 when the student never came or the last access is hidden. `quizaverage` is
+  -1 when the student finished none of the quizzes looked at.
+- The estimated time in the course is not sent. Groups, the hidden "last access" field and report
+  access to each quiz are respected as on the page.
+
 ## Privacy
 
 The plugin stores which chat app account belongs to which user (`local_darimaa_links`). Users can
@@ -237,7 +271,8 @@ the activities and the teacher overview on to the chat app when it answers.
 
 A connected teacher can also ask for reports about the students of their own courses, whether or
 not those students use the bot: student code, full name, last course access, estimated time in the
-course, number of missing assignments, and quiz results by topic. The plugin stores none of this.
+course, number of missing assignments, quiz results by topic, skipped quizzes and the warning
+signs of the attention list. The plugin stores none of this.
 It reads the data when the teacher asks and sends it to the bot, which shows it to the teacher in
 the chat app. Moodle permissions decide what a teacher may see, including separate groups and a
 hidden "last access" field.
@@ -264,7 +299,6 @@ push that changes the plugin (`.github/workflows/plugin-ci.yml` in the repositor
 ## Roadmap
 
 - Reminder text drafted with the Moodle AI subsystem
-- Students who need attention: inactive or behind on several assignments
 - Quiz results explained in plain language
 - Answers to free-text questions from course materials (AI), in Moodle and in Messenger
 - Reminders delivered to Telegram and Messenger by a message output plugin

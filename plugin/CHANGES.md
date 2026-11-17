@@ -1,5 +1,19 @@
 # Changes
 
+## 0.4.1 (2026-11-18)
+
+The assistant bot can show the list of students who need attention in the chat. Read-only: nothing
+is sent to students and nothing changes. No database changes; the nine existing web service
+functions keep their parameters and replies.
+
+- New web service function `local_darimaa_get_attention`: for a linked teacher, the students of a
+  course with at least one warning sign, the signs, and the numbers behind them (days away,
+  missing assignments, skipped quizzes, quiz average, weak topics). The same checks as on the
+  page: the teacher must be able to send reminders and see the participants, and groups, the
+  hidden "last access" field and quiz report access are respected. The estimated time is not sent.
+- The service "Darimaa bot" now has ten functions. Its name is unchanged.
+- The privacy metadata names the new data that the bot and the chat app get.
+
 ## 0.4.0 (2026-11-18)
 
 A page in Moodle that shows which students may need the teacher's attention, and why. Read-only:
