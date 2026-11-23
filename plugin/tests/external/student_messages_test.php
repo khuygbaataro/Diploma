@@ -141,7 +141,7 @@ final class student_messages_test extends \advanced_testcase {
         $this->assertSame(['Anu Dorj'], array_column($this->find('tg-teacher', 'SW26B001')['students'], 'fullname'));
         // A student of someone else's course is never found.
         $this->assertSame([], $this->find('tg-teacher', 'Khongor')['students']);
-        // "kh" matches Khatnaa only; the History student stays hidden.
+        // The text "kh" matches Khatnaa only; the History student stays hidden.
         $this->assertSame(['Khatnaa Bat'], array_column($this->find('tg-teacher', 'kh')['students'], 'fullname'));
         // One letter is too little.
         $this->assertSame([], $this->find('tg-teacher', 'k')['students']);
@@ -176,15 +176,21 @@ final class student_messages_test extends \advanced_testcase {
         $this->act_as_bot();
         $this->redirectMessages();
 
-        $result = send_message::execute('telegram', 'tg-teacher', $courses['biology']->id, $students['khatnaa']->id,
-            "Сайн байна уу!\nХичээлдээ суугаарай.");
+        $result = send_message::execute(
+            'telegram',
+            'tg-teacher',
+            $courses['biology']->id,
+            $students['khatnaa']->id,
+            "Сайн байна уу!\nХичээлдээ суугаарай."
+        );
         $result = external_api::clean_returnvalue(send_message::execute_returns(), $result);
 
         $this->assertSame(['linked' => true, 'sent' => true], $result);
         $messages = $this->chat_messages($teacher, $students['khatnaa']);
         $this->assertCount(1, $messages);
+        // Both lines arrive; Moodle decides how to store the line break.
+        $this->assertStringContainsString('Сайн байна уу!', $messages[0]->fullmessage);
         $this->assertStringContainsString('Хичээлдээ суугаарай.', $messages[0]->fullmessage);
-        $this->assertStringContainsString('<br>', $messages[0]->fullmessage);
     }
 
     /**
