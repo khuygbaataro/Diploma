@@ -58,6 +58,14 @@ if ($hassiteconfig) {
             PARAM_URL
         ));
 
+        $settings->add(new admin_setting_configtext(
+            'local_darimaa/telegrambot',
+            new lang_string('telegrambot', 'local_darimaa'),
+            new lang_string('telegrambot_desc', 'local_darimaa'),
+            '',
+            PARAM_TEXT
+        ));
+
         $settings->add(new admin_setting_configselect(
             'local_darimaa/studentcodefield',
             new lang_string('studentcodefield', 'local_darimaa'),

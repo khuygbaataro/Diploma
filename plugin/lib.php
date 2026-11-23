@@ -56,7 +56,7 @@ function local_darimaa_extend_navigation_course($navigation, $course, $context):
 }
 
 /**
- * Adds a "Messenger connection" link to the user's preferences page.
+ * Adds a "Chat app connection" link to the user's preferences page.
  *
  * @param navigation_node $navigation The user settings node.
  * @param stdClass $user The user whose settings are shown.
