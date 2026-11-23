@@ -105,7 +105,7 @@ the bot's settings. Running it again reuses what exists; `--newtoken` replaces t
 
 ## Web service functions
 
-The service "Darimaa bot" (`local_darimaa_bot`) has ten functions. All of them need the bot's
+The service "Darimaa bot" (`local_darimaa_bot`) has twelve functions. All of them need the bot's
 token and the capability `local/darimaa:botaccess`, and all take `channel` (for example
 `messenger`) and `externalid` (the account id the chat app gave the user). Permissions are always
 checked for the Moodle user linked to that chat account, never for the bot's own account. When
@@ -123,6 +123,8 @@ the chat account is not linked, the reply has `linked: false` and no data.
 | `local_darimaa_get_inactive_students` | read | (0.3) Last access, time spent and missing work of each student |
 | `local_darimaa_get_quiz_topic_results` | read | (0.3) Quiz results by topic |
 | `local_darimaa_get_attention` | read | (0.4.1) Students who need attention, with the reasons |
+| `local_darimaa_find_students` | read | (0.6) A teacher's students whose name or code contains a text |
+| `local_darimaa_send_message` | write | (0.6) A Moodle chat message from the teacher to one student, after the teacher confirms in the chat |
 
 The examples below use placeholders: put your own site address in place of `moodle.example.com`,
 the bot's token in place of `BOT-TOKEN`, and a linked teacher's chat account id in place of
@@ -283,8 +285,13 @@ the chat app. Moodle permissions decide what a teacher may see, including separa
 hidden "last access" field.
 
 The student code comes from the field chosen in the plugin settings (username, ID number or a
-custom profile field). Apart from that field, the bot never gets a username, email address, ID
-number or user id.
+custom profile field). Apart from that field, the bot never gets a username, email address or ID
+number. It gets a student's user id only from the student search (0.6), so that a teacher's
+message reaches the right student; the bot does not pass the user id on to the chat app.
+
+When the site turns on the bot's AI helper, the bot sends an AI service (for example OpenAI) the
+question and the report numbers it needs, with labels such as S1 in place of students: never
+their names, codes or email addresses.
 
 Reminders are delivered by the Moodle messaging system, which keeps its own records.
 

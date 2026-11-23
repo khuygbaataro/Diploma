@@ -1,5 +1,21 @@
 # Changes
 
+## 0.6.0 (2026-11-23)
+
+A teacher can send one student a Moodle chat message through the assistant bot, after reading it
+and confirming. No database changes; the existing web service functions keep their parameters and
+replies.
+
+- New web service function `local_darimaa_find_students`: the students of the linked teacher's
+  courses whose name or student code contains a text, at most ten, with the course. Separate
+  groups are respected.
+- New web service function `local_darimaa_send_message`: a Moodle chat message from the linked
+  teacher to a student of the given course. The teacher must be able to send reminders there and
+  see the student; Moodle's messaging rules and the student's privacy settings apply.
+- The service "Darimaa bot" now has twelve functions. Its name is unchanged.
+- The privacy metadata names the student's user id that the search gives the bot, and what the
+  bot sends an AI service when its AI helper is on (never names or codes).
+
 ## 0.5.0 (2026-11-23)
 
 Users can connect Telegram as well as Messenger. No database changes, and the web service
