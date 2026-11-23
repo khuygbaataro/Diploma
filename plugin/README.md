@@ -2,9 +2,9 @@
 
 A Moodle plugin that takes repetitive work off teachers' hands. It finds students who have not
 submitted an assignment and sends them a reminder that the teacher has checked and approved.
-From version 0.2 students and teachers can also use it from Facebook Messenger through the
-assistant's Messenger bot, a small separate service that talks to this plugin's web service
-functions. The technical name of the plugin is `local_darimaa`.
+From version 0.2 students and teachers can also use it from Facebook Messenger, and from 0.5
+from Telegram, through the assistant's chat bot, a small separate service that talks to this
+plugin's web service functions. The technical name of the plugin is `local_darimaa`.
 
 ## Features
 
@@ -21,8 +21,9 @@ functions. The technical name of the plugin is `local_darimaa`.
   page. Students can change the notification ways in their notification preferences.
 - **Safe defaults**: respects separate groups, switches itself off for anonymous submissions,
   hides last access when the site hides that field, and logs a `reminders_sent` event.
-- **Messenger connection** (0.2): users get a one-time code on *Preferences > Messenger connection*
-  and send it to the bot, which links their Messenger account to Moodle. No password passes
+- **Chat app connection** (0.2, Telegram since 0.5): users get a one-time code on
+  *Preferences > Chat app connection* and send it to the bot, which links their Telegram or
+  Messenger account to Moodle. A button opens the chat with the code. No password passes
   through the chat.
 - **Web service functions for the bot** (0.2): a student's open work from the calendar, a teacher's
   assignments with missing submissions, and sending reminders in the teacher's name. The bot only
@@ -63,6 +64,10 @@ functions. The technical name of the plugin is `local_darimaa`.
   chat message from the teacher, always as a Moodle notification, or always both. When chat is not
   possible the reminders go as notifications. Reminders sent by the bot follow this setting too.
 - **Messenger link**: the `m.me` link of the bot's Facebook Page, used for the "Open Messenger" button.
+  When a Telegram bot is set and this is empty, Messenger is not offered.
+- **Telegram bot** (0.5): the username of the bot's Telegram account, without the @, for example
+  `school_helper_bot`. When it is set, users can connect Telegram, and the "Open Telegram" button
+  opens `https://t.me/school_helper_bot?start=CODE`.
 - **Student code field** (0.3): the user field that holds the student code teachers know a student
   by. Choices: username (default), ID number, or any custom profile field. The reports for
   teachers show this code next to the student's name.
@@ -86,7 +91,7 @@ From 0.3.1 the plugin applies the last rule itself, so the result is the same on
 later versions. Before that it depended on Moodle: 5.0 left these accounts out of the participants
 of an assignment, later versions did not, and the reports for teachers still counted them.
 
-## Setting up the Messenger bot
+## Setting up the chat bot
 
 Run this once on the server, from the Moodle folder, as the web server user:
 

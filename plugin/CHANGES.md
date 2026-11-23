@@ -1,5 +1,17 @@
 # Changes
 
+## 0.5.0 (2026-11-23)
+
+Users can connect Telegram as well as Messenger. No database changes, and the web service
+functions keep their parameters and replies (the `telegram` channel was already accepted).
+
+- New setting "Telegram bot": the username of the site's Telegram bot. When it is set, the
+  connection page offers Telegram, with a button that opens the bot with the user's code.
+- The connection page ("Chat app connection", before "Messenger connection") shows each chat app
+  the site offers, each with its own code, status and disconnect button. Messenger is offered
+  when the Messenger link is set, or when no Telegram bot is set, as before.
+- The privacy metadata names Telegram as one of the chat apps.
+
 ## 0.4.1 (2026-11-18)
 
 The assistant bot can show the list of students who need attention in the chat. Read-only: nothing
