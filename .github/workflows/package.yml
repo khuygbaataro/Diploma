@@ -1,9 +1,14 @@
 name: Package
 
 # Started by hand: Actions > Package > Run workflow. The two zip files are then listed
-# under "Artifacts" on the page of the run.
+# under "Artifacts" on the page of the run. The tools are also tested on every push that
+# changes them.
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'tools/**'
+      - '.github/workflows/package.yml'
 
 permissions:
   contents: read
