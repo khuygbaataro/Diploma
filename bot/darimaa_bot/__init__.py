@@ -1,3 +1,3 @@
-"""Teacher & Student Assistant: a Messenger bot that answers students and teachers with data from Moodle."""
+"""Teacher & Student Assistant: a Telegram and Messenger bot that answers students and teachers with data from Moodle."""
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

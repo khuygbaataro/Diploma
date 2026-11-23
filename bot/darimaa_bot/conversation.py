@@ -92,7 +92,7 @@ def intent(text: str) -> str:
 
 
 class Bot:
-    """Answers one Messenger event at a time."""
+    """Answers one chat event at a time, in one chat app."""
 
     def __init__(
         self,
@@ -102,6 +102,7 @@ class Bot:
         clock: Callable[[], float] = time.time,
         weak_topic_below: float = 60.0,
         exam_points: float = 30.0,
+        app_name: str = "Messenger",
     ) -> None:
         self.moodle = moodle
         self.messenger = messenger
@@ -109,6 +110,7 @@ class Bot:
         self.clock = clock
         self.weak_topic_below = weak_topic_below
         self.exam_points = exam_points
+        self.app_name = app_name
         self.handled = TTLSet(ttl=3600)
         self.code_attempts = RateLimiter(limit=5, window=3600)
         self.recent_sends = TTLSet(ttl=600)
@@ -134,7 +136,7 @@ class Bot:
             try:
                 await self.messenger.send(event.sender_id, reply)
             except httpx.HTTPError as error:
-                log.error("Could not send a reply to Messenger: %s", error)
+                log.error("Could not send a reply to %s: %s", self.app_name, error)
                 return
 
     async def respond(self, event: Incoming) -> list[Reply]:
@@ -146,7 +148,7 @@ class Bot:
 
         user = await self.moodle.get_user(sender)
         if not user.get("linked"):
-            return [Reply(texts.not_linked(user.get("linkurl", "")))]
+            return [Reply(texts.not_linked(user.get("linkurl", ""), self.app_name))]
 
         if event.kind == "other":
             return [Reply(texts.NON_TEXT, self.menu(user))]
@@ -201,7 +203,7 @@ class Bot:
         user = await self.moodle.get_user(sender)
         if result.get("linked"):
             return [
-                Reply(texts.LINK_OK.format(firstname=result.get("firstname", ""))),
+                Reply(texts.LINK_OK.format(firstname=result.get("firstname", ""), app=self.app_name)),
                 Reply(self.help_text(user), self.menu(user)),
             ]
         if user.get("linked"):
@@ -216,7 +218,7 @@ class Bot:
         else:
             data = await self.moodle.get_deadlines(sender, days=7, overduedays=14)
         if not data.get("linked"):
-            return [Reply(texts.not_linked(user.get("linkurl", "")))]
+            return [Reply(texts.not_linked(user.get("linkurl", ""), self.app_name))]
 
         zone = self.zone(user.get("timezone"))
         items = data.get("items", [])
@@ -319,7 +321,7 @@ class Bot:
             return [Reply(texts.NO_PERMISSION, self.menu(user))]
         data = await self.moodle.get_attention(sender, courseid, days=ATTENTION_DAYS)
         if not data.get("linked"):
-            return [Reply(texts.not_linked(user.get("linkurl", "")))]
+            return [Reply(texts.not_linked(user.get("linkurl", ""), self.app_name))]
 
         course = data.get("coursename", "")
         total = int(data.get("total", 0))
@@ -368,7 +370,7 @@ class Bot:
             return [Reply(texts.NO_PERMISSION, self.menu(user))]
         data = await self.moodle.get_inactive_students(sender, courseid, days=INACTIVE_DAYS)
         if not data.get("linked"):
-            return [Reply(texts.not_linked(user.get("linkurl", "")))]
+            return [Reply(texts.not_linked(user.get("linkurl", ""), self.app_name))]
         if not data.get("lastaccessavailable", True):
             return [Reply(texts.INACTIVE_HIDDEN, self.menu(user))]
 
@@ -424,7 +426,7 @@ class Bot:
             return [Reply(texts.NO_PERMISSION, self.menu(user))]
         data = await self.moodle.get_quiz_topic_results(sender, cmid)
         if not data.get("linked"):
-            return [Reply(texts.not_linked(user.get("linkurl", "")))]
+            return [Reply(texts.not_linked(user.get("linkurl", ""), self.app_name))]
 
         names = {"quiz": data.get("quizname", ""), "course": data.get("coursename", "")}
         students = data.get("students", [])

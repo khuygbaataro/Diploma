@@ -488,14 +488,15 @@ def test_quick_reply_titles_fit_in_twenty_characters(setup):
 # Release.
 
 
-def test_release_is_0_4_0_and_the_readme_names_what_is_new():
+def test_release_is_0_5_0_and_the_readme_names_what_is_new():
     from pathlib import Path
 
     import darimaa_bot
 
-    assert darimaa_bot.__version__ == "0.4.0"
+    assert darimaa_bot.__version__ == "0.5.0"
     readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
-    for needed in ("0.4.0", "0.4.1", "WEAK_TOPIC_BELOW", "EXAM_POINTS", texts.MENU_ATTENTION, texts.MENU_INACTIVE,
+    for needed in ("0.5.0", "TELEGRAM_BOT_TOKEN", "TELEGRAM_SECRET", "darimaa_bot.setup_telegram",
+                   "/darimaa-bot/telegram/webhook", "0.4.0", "WEAK_TOPIC_BELOW", "EXAM_POINTS", texts.MENU_ATTENTION, texts.MENU_INACTIVE,
                    texts.MENU_QUIZ, "local_darimaa_get_attention", "local_darimaa_get_inactive_students",
                    "local_darimaa_get_quiz_topic_results"):
         assert needed in readme, needed

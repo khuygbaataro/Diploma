@@ -1,6 +1,6 @@
-# Багш, оюутны туслах: Messenger бот
+# Багш, оюутны туслах: Telegram, Messenger бот
 
-Оюутан, багш Facebook Messenger-ээр дамжуулан Moodle-ээс мэдээлэл авдаг бот. Moodle-ийн `local_darimaa` plugin-ий 0.4.1 ба түүнээс шинэ хувилбартай хамт ажиллана.
+Оюутан, багш Telegram эсвэл Facebook Messenger-ээр дамжуулан Moodle-ээс мэдээлэл авдаг бот. Moodle-ийн `local_darimaa` plugin-ий 0.5.0 ба түүнээс шинэ хувилбартай хамт ажиллана. Telegram, Messenger-ийн аль нэгийг эсвэл хоёуланг нь зэрэг ашиглаж болно.
 
 Техникийн нэр нь `local_darimaa` (plugin), `darimaa-bot` (бот) хэвээр үлдсэн. Хэрэглэгчид зөвхөн «Багш, оюутны туслах» гэсэн нэрийг харна.
 
@@ -18,7 +18,7 @@
 
 ## 1. Moodle тал
 
-1. `local_darimaa-0.4.1.zip` файлыг Site administration → Plugins → Install plugins хэсгээр оруулна. Хуучин хувилбар шинэчлэгдэнэ.
+1. `local_darimaa-0.5.0.zip` файлыг Site administration → Plugins → Install plugins хэсгээр оруулна. Хуучин хувилбар шинэчлэгдэнэ.
 2. Сервер дээр ботын токен үүсгэнэ. Moodle-ийн хавтас руу (`config.php` байгаа газар) орж ажиллуулна:
 
    ```bash
@@ -35,7 +35,7 @@
 Компьютер дээрээ (Windows CMD) ZIP файлаа сервер рүү хуулна:
 
 ```bat
-scp %USERPROFILE%\Downloads\darimaa-bot-0.4.0.zip moodle@SERVER-IP:~/
+scp %USERPROFILE%\Downloads\darimaa-bot-0.5.0.zip moodle@SERVER-IP:~/
 ```
 
 Сервер дээр:
@@ -43,7 +43,7 @@ scp %USERPROFILE%\Downloads\darimaa-bot-0.4.0.zip moodle@SERVER-IP:~/
 ```bash
 sudo apt install -y python3-venv unzip
 sudo useradd --system --home /opt/darimaa-bot --shell /usr/sbin/nologin darimaa
-sudo unzip ~/darimaa-bot-0.4.0.zip -d /opt/
+sudo unzip ~/darimaa-bot-0.5.0.zip -d /opt/
 sudo python3 -m venv /opt/darimaa-bot/venv
 sudo /opt/darimaa-bot/venv/bin/pip install -r /opt/darimaa-bot/requirements.txt
 sudo cp /opt/darimaa-bot/.env.example /opt/darimaa-bot/.env
@@ -85,6 +85,37 @@ sudo apache2ctl configtest && sudo systemctl reload apache2
 Шалгах: `curl https://ТАНЫ-ДОМЭЙН/darimaa-bot/healthz` нь `{"ok":true}` гэж хариулах ёстой.
 
 Moodle чинь https-гүй, эсвэл зөвхөн IP хаягаар нээгддэг бол эхлээд домэйн холбож, Let's Encrypt (`certbot`)-ээр https тохируулна.
+
+## 4а. Telegram тал
+
+Сервер Facebook-т хүрч чадахгүй бол (жишээ нь сүлжээний шүүлтүүр хаасан бол) Telegram ашиглана. Хоёуланг нь зэрэг ашиглаж ч болно.
+
+1. Telegram дээр **@BotFather**-тай чатлаад `/newbot` гэж бичнэ. Ботын нэр (жишээ нь «Багш, оюутны туслах»), дараа нь `bot`-оор төгссөн username (жишээ нь `school_helper_bot`) өгнө. BotFather токен хэвлэнэ. Токеныг хэнд ч бүү үзүүл, чатаар бүү явуул.
+2. Сервер дээр `.env`-д хоёр мөр нэмнэ:
+
+   ```bash
+   sudo nano /opt/darimaa-bot/.env
+   ```
+
+   ```
+   TELEGRAM_BOT_TOKEN=BotFather-ийн-өгсөн-токен
+   TELEGRAM_SECRET=өөрөө-зохиосон-урт-санамсаргүй-үг
+   ```
+
+   `TELEGRAM_SECRET`-ийг ингэж үүсгэж болно: `openssl rand -hex 24`. Messenger ашиглахгүй бол `FB_...` мөрүүдийг устгаж болно.
+3. Ботыг дахин ажиллуулаад webhook-ийг тохируулна:
+
+   ```bash
+   sudo systemctl restart darimaa-bot
+   cd /opt/darimaa-bot
+   sudo -u darimaa venv/bin/python -m darimaa_bot.setup_telegram https://ТАНЫ-ДОМЭЙН/darimaa-bot/telegram/webhook
+   ```
+
+   Амжилттай бол ботын username-ийг хэвлэнэ.
+4. Moodle дээр Site administration → Plugins → Local plugins → Teacher & Student Assistant → **Telegram bot** талбарт тэр username-ийг (`@`-гүй) бичнэ. Хэрэглэгчийн «Chat app connection» хуудсанд Telegram гарч ирнэ. «Messenger link» хоосон бол Messenger тэнд харагдахгүй.
+5. Хэрэглэгч Moodle-ээс код аваад «Open Telegram» товч дарна. Telegram нээгдэж, START дарахад холбогдоно. Эсвэл кодоо ботод бичиж явуулна.
+
+Бот зөвхөн хувийн чатад хариулна. Бүлгийн чатад нэмсэн ч хариулахгүй, учир нь багшийн тайлан бусдад харагдах ёсгүй.
 
 ## 4. Meta тал
 
@@ -150,6 +181,18 @@ Moodle чинь https-гүй, эсвэл зөвхөн IP хаягаар нээг
 Оюутны код Moodle-ийн аль талбарт байгааг plugin-ий тохиргооноос сонгоно (Site administration → Plugins → Local plugins → Teacher & Student Assistant → Student code field).
 
 ## Өөрчлөлт
+
+### 0.5.0 (2026-11-23)
+
+Telegram нэмсэн. Plugin-ий 0.5.0 ба түүнээс шинэ хувилбар шаардлагатай.
+
+- Бот Telegram дээр Messenger-тэй адилхан ажиллана: цэс, 7 хоногийн ажил, хоцорсон ажил, багшийн тайлан, сануулга. Товчнууд Telegram-ын товч хэлбэрээр гарна.
+- Moodle-ийн кодтой холбоос (`https://t.me/бот?start=КОД`) дарахад шууд холбогдоно.
+- Шинэ тохиргоо: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_SECRET`. Шинэ тушаал: `python -m darimaa_bot.setup_telegram`.
+- Messenger-ийн тохиргоо заавал биш болсон: зөвхөн Telegram-аар ажиллуулж болно.
+- Ботын токен логт хэзээ ч бичигдэхгүй. Бүлгийн чатад хариулахгүй.
+
+Шинэчлэхдээ эхлээд plugin-аа 0.5.0 болгоно. Дараа нь ботын шинэ файлуудыг `/opt/darimaa-bot` руу хуулаад «4а. Telegram тал» хэсгийг дагана. Шинээр суулгах сан байхгүй.
 
 ### 0.4.0 (2026-11-18)
 

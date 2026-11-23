@@ -93,9 +93,10 @@ def test_tokens_never_reach_the_log(caplog, graph_status):
     with caplog.at_level(logging.DEBUG), client:
         assert client.post("/webhook", content=raw, headers=headers).status_code == 200
 
-    # The request to Meta was made and logged, whether Meta accepted it or not.
+    # The request to Meta was made, whether Meta accepted it or not. httpx does not log request
+    # addresses: a Telegram address holds the bot token.
     assert sent
-    assert "graph.facebook.com" in caplog.text
+    assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
     for secret in ("page-token", "moodle-token", "app-secret"):
         assert secret not in caplog.text
     # The Messenger account id stays out of the log too.
