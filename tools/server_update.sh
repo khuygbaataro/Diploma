@@ -24,14 +24,20 @@ if [ "$(id -u)" -ne 0 ] && [ -z "${DARIMAA_TEST:-}" ]; then
 fi
 command -v rsync >/dev/null || { echo "rsync is missing: sudo apt install -y rsync" >&2; exit 1; }
 
-# Moodle 5.1 and later keep the web files in public/.
+# Moodle 5.1 and later keep the web files (plugins included) in public/, and the command line
+# scripts stay in admin/cli at the top. Moodle 5.0 has both at the top.
 if [ -d "$MOODLE_DIR/public" ]; then
     WEB_ROOT="$MOODLE_DIR/public"
 else
     WEB_ROOT="$MOODLE_DIR"
 fi
+if [ -f "$MOODLE_DIR/admin/cli/upgrade.php" ]; then
+    CLI_DIR="$MOODLE_DIR/admin/cli"
+else
+    CLI_DIR="$WEB_ROOT/admin/cli"
+fi
 PLUGIN_DIR="$WEB_ROOT/local/darimaa"
-[ -f "$WEB_ROOT/admin/cli/upgrade.php" ] || { echo "Moodle not found in $MOODLE_DIR (set MOODLE_DIR)" >&2; exit 1; }
+[ -f "$CLI_DIR/upgrade.php" ] || { echo "Moodle not found in $MOODLE_DIR (set MOODLE_DIR)" >&2; exit 1; }
 [ -x "$BOT_DIR/venv/bin/pip" ] || { echo "Bot virtual environment not found in $BOT_DIR/venv" >&2; exit 1; }
 
 say "Getting the newest code"
@@ -59,8 +65,8 @@ say "Updating the Moodle plugin in $PLUGIN_DIR"
 owner="$(stat -c '%U:%G' "$WEB_ROOT/local")"
 rsync -a --delete "$SRC/plugin/" "$PLUGIN_DIR/"
 chown -R "$owner" "$PLUGIN_DIR"
-sudo -u "$WEB_USER" php "$WEB_ROOT/admin/cli/upgrade.php" --non-interactive
-sudo -u "$WEB_USER" php "$WEB_ROOT/admin/cli/purge_caches.php"
+sudo -u "$WEB_USER" php "$CLI_DIR/upgrade.php" --non-interactive
+sudo -u "$WEB_USER" php "$CLI_DIR/purge_caches.php"
 
 say "Done"
 grep -o "release = '[^']*'" "$PLUGIN_DIR/version.php" | sed "s/release = /Plugin: /"
