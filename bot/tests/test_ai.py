@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from darimaa_bot import texts
-from darimaa_bot.ai import AIError, Assistant, Labels, OpenAIClient
+from darimaa_bot.ai import AIError, Answer, Assistant, Labels, OpenAIClient
 from darimaa_bot.config import Settings
 from darimaa_bot.conversation import Bot
 from darimaa_bot.messenger import Incoming
@@ -69,7 +69,7 @@ def ask(fake: FakeOpenAI, question: str, moodle: FakeMoodle, sender: str = TEACH
         async with httpx.AsyncClient(transport=httpx.MockTransport(fake)) as http:
             assistant = Assistant(OpenAIClient("https://api.openai.com/v1/", API_KEY, "gpt-6.2-sol", http))
             return await assistant.answer(question, {"isteacher": teacher}, moodle, sender, ZONE, NOW)
-    return asyncio.run(go())
+    return asyncio.run(go()).text
 
 
 def test_labels_hide_students_and_come_back():
@@ -104,7 +104,7 @@ def test_teacher_question_uses_a_tool_and_names_come_back_only_in_the_answer():
     assert "2026" in first["input"][0]["content"] and "teacher" in first["input"][0]["content"]
     assert {tool["name"] for tool in first["tools"]} == {
         "get_my_deadlines", "list_courses", "get_attention", "get_inactive_students", "get_quiz_results",
-        "get_missing_assignments"}
+        "get_missing_assignments", "find_student", "prepare_message"}
     assert all(tool["strict"] and tool["parameters"]["additionalProperties"] is False for tool in first["tools"])
     # Each call is answered, and the model's own items (reasoning included) go back unchanged.
     courses = json.loads(second["input"][-1]["output"])
@@ -186,7 +186,7 @@ class FakeAssistant:
         self.questions.append(question)
         if self.error:
             raise self.error
-        return self.reply
+        return Answer(self.reply)
 
 
 def bot_with(assistant: FakeAssistant):

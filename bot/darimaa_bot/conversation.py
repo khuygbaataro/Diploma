@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import secrets
 import time
 from datetime import datetime, timedelta
 from typing import Any, Callable
@@ -12,7 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 
 from . import texts
-from .ai import AIError, Assistant
+from .ai import AIError, Assistant, Draft
 from .memory import RateLimiter, TTLSet
 from .messenger import Incoming, MessengerClient, Reply, account_ref
 from .moodle import MoodleClient, MoodleError
@@ -28,6 +29,7 @@ MAX_CHOICES = 10
 INACTIVE_DAYS = 7
 ATTENTION_DAYS = 7
 AI_MIN_WORDS = 5  # with the assistant on, messages this long go to it before the keyword rules
+DRAFT_TTL = 1800  # seconds a message draft waits for the teacher's confirmation
 
 # The teacher reports start with a course. Each one continues with this payload plus the course id.
 COURSE_STEPS = {"ATTENTION": "ATTENTION_COURSE", "INACTIVE": "INACTIVE_COURSE", "QUIZ": "QUIZ_COURSE"}
@@ -56,6 +58,11 @@ ERROR_TEXTS = {
     "unsupportedanonymous": texts.ANONYMOUS,
     # The function is not in the bot's service yet: the plugin is older than the bot.
     "accessexception": texts.PLUGIN_TOO_OLD,
+    # A teacher's message to a student (plugin 0.6.0).
+    "notyourstudent": texts.MSG_NOT_YOUR_STUDENT,
+    "chatnotpossible": texts.MSG_CHAT_OFF,
+    "messagerefused": texts.MSG_REFUSED,
+    "messagelength": texts.MSG_LENGTH,
 }
 
 
@@ -115,6 +122,7 @@ class Bot:
         self.exam_points = exam_points
         self.app_name = app_name
         self.ai = ai
+        self.drafts: dict[str, tuple[str, Draft, float]] = {}  # id -> (sender, draft, expires)
         self.handled = TTLSet(ttl=3600)
         self.code_attempts = RateLimiter(limit=5, window=3600)
         self.recent_sends = TTLSet(ttl=600)
@@ -195,6 +203,8 @@ class Bot:
             return await self.choose_quiz(sender, user, int(argument))
         if name == "QUIZ_SHOW" and argument.isdigit():
             return await self.quiz_results(sender, user, int(argument))
+        if name == "MSG" and argument:
+            return await self.send_draft(sender, user, argument)
         if name == "UNLINK":
             return [Reply(texts.UNLINK_CONFIRM, buttons=[(texts.YES_UNLINK, "UNLINK_YES"), (texts.NO, "CANCEL")])]
         if name == "UNLINK_YES":
@@ -220,7 +230,33 @@ class Bot:
         except (AIError, httpx.HTTPError) as error:
             log.warning("The AI assistant could not answer account %s: %s", account_ref(sender), error)
             return [Reply(texts.AI_ERROR, self.menu(user))]
-        return [Reply(f"{answer}\n\n{texts.AI_NOTE}", self.menu(user))]
+        replies = [Reply(f"{answer.text}\n\n{texts.AI_NOTE}", self.menu(user))]
+        for draft in answer.drafts if user.get("isteacher") else []:
+            draftid = self.keep_draft(sender, draft)
+            text = texts.MSG_CONFIRM.format(student=draft.student, course=draft.course, text=draft.text)
+            replies.append(Reply(text, buttons=[(texts.YES_SEND, f"MSG:{draftid}"), (texts.NO, "CANCEL")]))
+        return replies
+
+    def keep_draft(self, sender: str, draft: Draft) -> str:
+        now = self.clock()
+        self.drafts = {key: value for key, value in self.drafts.items() if value[2] > now}
+        draftid = secrets.token_hex(4)
+        self.drafts[draftid] = (sender, draft, now + DRAFT_TTL)
+        return draftid
+
+    async def send_draft(self, sender: str, user: dict[str, Any], draftid: str) -> list[Reply]:
+        """Sends a message the teacher has just confirmed. A second tap finds nothing to send."""
+        if not user.get("isteacher"):
+            return [Reply(texts.NO_PERMISSION, self.menu(user))]
+        kept = self.drafts.get(draftid)
+        if not kept or kept[0] != sender or kept[2] <= self.clock():
+            return [Reply(texts.MSG_GONE, self.menu(user))]
+        del self.drafts[draftid]
+        draft = kept[1]
+        result = await self.moodle.send_message(sender, draft.courseid, draft.userid, draft.text)
+        if not result.get("sent"):
+            return [Reply(texts.MSG_GONE, self.menu(user))]
+        return [Reply(texts.MSG_SENT.format(student=draft.student), self.menu(user))]
 
     async def link(self, sender: str, code: str) -> list[Reply]:
         if not self.code_attempts.allow(sender):

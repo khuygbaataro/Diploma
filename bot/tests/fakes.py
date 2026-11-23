@@ -32,6 +32,9 @@ class FakeMoodle:
         # The attention list (plugin 0.4.1), by course id.
         self.attention: dict[int, dict[str, Any]] = {}
         self.attention_days: list[int] = []
+        # Students a teacher can find and write to (plugin 0.6.0), by teacher id; messages sent.
+        self.roster: dict[int, list[dict[str, Any]]] = {}
+        self.messages: list[tuple[int, int, int, str]] = []
 
     async def get_user(self, externalid: str) -> dict[str, Any]:
         self.calls.append("get_user")
@@ -111,6 +114,23 @@ class FakeMoodle:
                 "quizzes": 0, "total": 0, "students": []} | self.attention.get(courseid, {})
 
 
+    async def find_students(self, externalid: str, query: str) -> dict[str, Any]:
+        self.calls.append("find_students")
+        userid = self.links.get(externalid)
+        query = query.strip().lower()
+        found = [row for row in self.roster.get(userid, [])
+                 if len(query) >= 2 and query in f"{row['fullname']} {row['code']}".lower()]
+        return {"linked": bool(userid), "students": found[:10]}
+
+    async def send_message(self, externalid: str, courseid: int, userid: int, message: str) -> dict[str, Any]:
+        self.calls.append("send_message")
+        teacher = self.links.get(externalid)
+        if not any(row["userid"] == userid and row["courseid"] == courseid for row in self.roster.get(teacher, [])):
+            raise MoodleError("notyourstudent", "This student is not one of the students you can see in this course.")
+        self.messages.append((teacher, courseid, userid, message))
+        return {"linked": True, "sent": True}
+
+
 def course(courseid: int, fullname: str, students: int = 0, quizzes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """One row of get_courses."""
     return {"id": courseid, "fullname": fullname, "shortname": fullname[:3].upper(), "students": students,
@@ -145,6 +165,11 @@ def attention_student(code: str, fullname: str, signals: list[str], dayssince: i
             "notattempted": notattempted, "quizaverage": quizaverage,
             "weaktopics": [{"name": name, "percent": value} for name, value in (weaktopics or {}).items()],
             "signals": signals}
+
+
+def roster_student(userid: int, code: str, fullname: str, courseid: int, coursename: str) -> dict[str, Any]:
+    """One student row of find_students."""
+    return {"userid": userid, "code": code, "fullname": fullname, "courseid": courseid, "coursename": coursename}
 
 
 class FakeMessenger:

@@ -2,7 +2,8 @@
 
 The model never sees a student's name, code or email. Each student in a tool result becomes a label
 such as S3, and the bot puts the code and name back into the answer before it is sent. The model
-only reads: sending reminders stays behind the teacher's «Тийм, явуул» button.
+only reads. It may prepare a message to a student, but the bot only shows it to the teacher with a
+«Тийм, явуул» button: nothing reaches a student until the teacher taps it.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Awaitable, Callable
 from zoneinfo import ZoneInfo
@@ -24,6 +26,8 @@ log = logging.getLogger(__name__)
 MAX_ROUNDS = 5
 MAX_QUESTION = 1000
 MAX_ROWS = 60
+MAX_MESSAGE = 500
+MAX_DRAFTS = 3
 # A label may carry a Mongolian suffix after a hyphen, as in "S3-д".
 LABEL_PATTERN = re.compile(r"(?<![\w-])S(\d{1,4})(?!\w)")
 
@@ -34,8 +38,13 @@ Answer in plain, short, everyday Mongolian (Cyrillic script).
   give the answer, say so.
 - Students appear as labels such as S3. Refer to a student only by that exact label. Never guess a
   real name. The app shows the real name in place of the label.
-- You can only read data. You cannot send messages or change anything in Moodle. If the user wants
-  to send reminders, tell them to tap «Илгээгээгүй».
+- You can only read data and prepare drafts. You cannot change anything in Moodle. To remind all
+  students who have not submitted an assignment, tell the user to tap «Илгээгээгүй».
+- A teacher can ask you to write to one student. Find the student first (find_student for a name
+  the teacher typed), then call prepare_message. It is not sent: the teacher sees the draft with a
+  confirm button. Write it in polite Mongolian, in the teacher's voice, at most 500 characters. You
+  may use the student's label as their name (the app puts the real name in). Then tell the teacher
+  to read the draft and tap «Тийм, явуул». If several students match, ask which one.
 - The warning signs are hints for a conversation with the student, not a grade.
 - If a question is not about the user's courses, deadlines or students, say briefly what you can
   help with.
@@ -44,6 +53,25 @@ Answer in plain, short, everyday Mongolian (Cyrillic script).
 
 class AIError(Exception):
     """The AI service could not be reached or refused the request."""
+
+
+@dataclass
+class Draft:
+    """A message to a student that waits for the teacher's confirmation."""
+
+    courseid: int
+    userid: int
+    student: str  # code and name, as the teacher knows the student
+    course: str
+    text: str
+
+
+@dataclass
+class Answer:
+    """The assistant's reply, and any drafts the teacher still has to confirm."""
+
+    text: str
+    drafts: list[Draft] = field(default_factory=list)
 
 
 class OpenAIClient:
@@ -99,17 +127,29 @@ class Labels:
     def __init__(self) -> None:
         self._by_student: dict[tuple[str, str], str] = {}
         self._shown: dict[str, str] = {}
+        self.rows: dict[str, dict[str, Any]] = {}
 
-    def label(self, student: dict[str, Any]) -> str:
+    def label(self, student: dict[str, Any], **known: Any) -> str:
+        """The student's label. Known facts, such as the user id or course, are kept for a message."""
         key = (str(student.get("code", "")), str(student.get("fullname", "")))
         if key not in self._by_student:
             label = f"S{len(self._by_student) + 1}"
             self._by_student[key] = label
             self._shown[label] = " ".join(part for part in key if part) or label
-        return self._by_student[key]
+            self.rows[label] = {"code": key[0], "fullname": key[1]}
+        label = self._by_student[key]
+        self.rows[label].update({name: value for name, value in (student | known).items()
+                                 if name in ("userid", "courseid", "coursename") and value})
+        return label
 
-    def restore(self, text: str) -> str:
-        return LABEL_PATTERN.sub(lambda match: self._shown.get(match.group(0), match.group(0)), text)
+    def restore(self, text: str, with_code: bool = True) -> str:
+        """Puts the students back: "code name" in answers, the name alone in a message to a student."""
+        def shown(match: re.Match[str]) -> str:
+            label = match.group(0)
+            if label not in self._shown:
+                return label
+            return self._shown[label] if with_code else self.rows[label]["fullname"] or label
+        return LABEL_PATTERN.sub(shown, text)
 
 
 def _tool(name: str, description: str, properties: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -154,6 +194,20 @@ TEACHER_TOOLS = STUDENT_TOOLS + [
         {"cmid": {"type": "integer", "description": "The quiz cmid from list_courses"}},
     ),
     _tool("get_missing_assignments", "The teacher's recent assignments and how many students have not submitted each."),
+    _tool(
+        "find_student",
+        "Finds the teacher's students whose name or student code contains the text, with their course.",
+        {"name": {"type": "string", "description": "Part of the name or code, as the teacher typed it"}},
+    ),
+    _tool(
+        "prepare_message",
+        "Prepares a Moodle chat message from the teacher to one student. It is NOT sent: the teacher "
+        "confirms it with a button.",
+        {
+            "student": {"type": "string", "description": "The student's label, such as S3"},
+            "text": {"type": "string", "description": "The message, plain text, at most 500 characters"},
+        },
+    ),
 ]
 
 
@@ -168,8 +222,9 @@ class Assistant:
         return self.limiter.allow(sender)
 
     async def answer(self, question: str, user: dict[str, Any], moodle: MoodleClient, sender: str,
-                     zone: ZoneInfo, now: float) -> str:
+                     zone: ZoneInfo, now: float) -> Answer:
         labels = Labels()
+        drafts: list[Draft] = []
         teacher = bool(user.get("isteacher"))
         tools = TEACHER_TOOLS if teacher else STUDENT_TOOLS
         today = datetime.fromtimestamp(now, zone)
@@ -178,7 +233,7 @@ class Assistant:
                                              f"The user is a {'teacher' if teacher else 'student'}."},
             {"role": "user", "content": question[:MAX_QUESTION]},
         ]
-        handlers = self._handlers(moodle, sender, labels, zone, teacher)
+        handlers = self._handlers(moodle, sender, labels, zone, teacher, drafts)
 
         for _ in range(MAX_ROUNDS):
             response = await self.client.respond(input_items, tools)
@@ -195,7 +250,7 @@ class Assistant:
                 usage = response.get("usage") or {}
                 log.info("AI answered a question: %s input tokens, %s output tokens",
                          usage.get("input_tokens"), usage.get("output_tokens"))
-                return labels.restore(text)
+                return Answer(labels.restore(text), drafts)
 
             # The model's own items go back unchanged, followed by one result for each call.
             input_items += output
@@ -227,8 +282,8 @@ class Assistant:
             # For example a course the user does not teach. The model is told, and tells the user.
             return {"error": error.errorcode or "refused"}
 
-    def _handlers(self, moodle: MoodleClient, sender: str, labels: Labels, zone: ZoneInfo,
-                  teacher: bool) -> dict[str, Callable[..., Awaitable[Any]]]:
+    def _handlers(self, moodle: MoodleClient, sender: str, labels: Labels, zone: ZoneInfo, teacher: bool,
+                  drafts: list[Draft]) -> dict[str, Callable[..., Awaitable[Any]]]:
         def when(timestamp: Any) -> str:
             return datetime.fromtimestamp(int(timestamp), zone).strftime("%Y-%m-%d %H:%M") if timestamp else ""
 
@@ -250,7 +305,7 @@ class Assistant:
                 "course": data.get("coursename"), "students_looked_at": data.get("total"),
                 "last_visit_hidden": not data.get("lastaccessavailable", True),
                 "students": [{
-                    "student": labels.label(row), "signs": row.get("signals", []),
+                    "student": labels.label(row, courseid=int(courseid)), "signs": row.get("signals", []),
                     "days_since_visit": row.get("dayssince"), "missing_assignments": row.get("missing"),
                     "quizzes_not_attempted": row.get("notattempted"), "quiz_average": row.get("quizaverage"),
                     "weak_topics": row.get("weaktopics", []),
@@ -263,7 +318,7 @@ class Assistant:
                 "course": data.get("coursename"), "days": data.get("days"),
                 "last_visit_hidden": not data.get("lastaccessavailable", True),
                 "students": [{
-                    "student": labels.label(row), "days_since_visit": row.get("dayssince"),
+                    "student": labels.label(row, courseid=int(courseid)), "days_since_visit": row.get("dayssince"),
                     "minutes_in_course": row.get("minutes"), "missing_assignments": row.get("missing"),
                     "inactive": row.get("inactive"),
                 } for row in data.get("students", [])[:MAX_ROWS]],
@@ -286,6 +341,35 @@ class Assistant:
             return [{"name": row.get("name"), "course": row.get("coursename"), "due": when(row.get("duedate")),
                      "students_missing": row.get("missing")} for row in data.get("assignments", [])[:MAX_ROWS]]
 
+        async def find_student(name: str) -> Any:
+            data = await moodle.find_students(sender, str(name)[:100])
+            return [{"student": labels.label(row), "course": row.get("coursename"), "courseid": row.get("courseid")}
+                    for row in data.get("students", [])]
+
+        async def prepare_message(student: str, text: str) -> Any:
+            row = labels.rows.get(str(student))
+            if row is None:
+                return {"error": "unknown student label: find the student first"}
+            text = labels.restore(str(text), with_code=False).strip()
+            if not text or len(text) > MAX_MESSAGE:
+                return {"error": f"the message must have 1 to {MAX_MESSAGE} characters"}
+            if len(drafts) >= MAX_DRAFTS:
+                return {"error": f"at most {MAX_DRAFTS} messages at a time"}
+            if not row.get("userid"):
+                # A student from a report: look them up to learn who exactly they are.
+                found = (await moodle.find_students(sender, row["fullname"] or row["code"])).get("students", [])
+                same = [hit for hit in found if hit.get("code") == row["code"] and hit.get("fullname") == row["fullname"]]
+                if row.get("courseid"):
+                    same = [hit for hit in same if hit.get("courseid") == row["courseid"]] or same
+                if not same:
+                    return {"error": "the student was not found"}
+                labels.label(same[0])
+            drafts.append(Draft(
+                courseid=int(row["courseid"]), userid=int(row["userid"]),
+                student=labels.restore(str(student)), course=str(row.get("coursename", "")), text=text,
+            ))
+            return {"status": "draft ready: the teacher must read it and tap the confirm button"}
+
         handlers: dict[str, Callable[..., Awaitable[Any]]] = {"get_my_deadlines": get_my_deadlines}
         if teacher:
             handlers |= {
@@ -294,5 +378,7 @@ class Assistant:
                 "get_inactive_students": get_inactive_students,
                 "get_quiz_results": get_quiz_results,
                 "get_missing_assignments": get_missing_assignments,
+                "find_student": find_student,
+                "prepare_message": prepare_message,
             }
         return handlers

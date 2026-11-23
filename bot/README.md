@@ -1,6 +1,6 @@
 # Багш, оюутны туслах: Telegram, Messenger бот
 
-Оюутан, багш Telegram эсвэл Facebook Messenger-ээр дамжуулан Moodle-ээс мэдээлэл авдаг бот. Moodle-ийн `local_darimaa` plugin-ий 0.5.0 ба түүнээс шинэ хувилбартай хамт ажиллана. Telegram, Messenger-ийн аль нэгийг эсвэл хоёуланг нь зэрэг ашиглаж болно.
+Оюутан, багш Telegram эсвэл Facebook Messenger-ээр дамжуулан Moodle-ээс мэдээлэл авдаг бот. Moodle-ийн `local_darimaa` plugin-ий 0.6.0 ба түүнээс шинэ хувилбартай хамт ажиллана. Telegram, Messenger-ийн аль нэгийг эсвэл хоёуланг нь зэрэг ашиглаж болно.
 
 Техникийн нэр нь `local_darimaa` (plugin), `darimaa-bot` (бот) хэвээр үлдсэн. Хэрэглэгчид зөвхөн «Багш, оюутны туслах» гэсэн нэрийг харна.
 
@@ -10,6 +10,7 @@
 - Багшид анхаарал хэрэгтэй оюутнуудыг шалтгаантай нь харуулна (0.4.0). Зөвхөн харуулна.
 - Багшид хичээлийнхээ идэвхгүй оюутнуудыг харуулна (0.3.0). Зөвхөн харуулна, оюутанд юу ч явуулахгүй.
 - Багшид сорилын дүнг сэдэв тус бүрээр, сул сэдэвтэй оюутнуудын хамт харуулна (0.3.0). Зөвхөн харуулна.
+- Багшийн хүсэлтээр нэг оюутанд Moodle чатаар мессеж бэлдэнэ (0.7.0). Багш уншаад «Тийм, явуул» дарсны дараа л явна.
 - Хиймэл оюун (заавал биш, 0.6.0): товч, түлхүүр үгээр ойлгохгүй асуултад OpenAI-ийн загвараар хариулна. Зөвхөн уншина, оюутанд юу ч явуулахгүй.
 - Хүн бүр Moodle-ээс авсан нэг удаагийн кодоор Messenger-ээ Moodle данстайгаа холбоно. Нууц үг чатаар дамжихгүй.
 
@@ -19,7 +20,7 @@
 
 ## 1. Moodle тал
 
-1. `local_darimaa-0.5.0.zip` файлыг Site administration → Plugins → Install plugins хэсгээр оруулна. Хуучин хувилбар шинэчлэгдэнэ.
+1. `local_darimaa-0.6.0.zip` файлыг Site administration → Plugins → Install plugins хэсгээр оруулна. Хуучин хувилбар шинэчлэгдэнэ.
 2. Сервер дээр ботын токен үүсгэнэ. Moodle-ийн хавтас руу (`config.php` байгаа газар) орж ажиллуулна:
 
    ```bash
@@ -36,7 +37,7 @@
 Компьютер дээрээ (Windows CMD) ZIP файлаа сервер рүү хуулна:
 
 ```bat
-scp %USERPROFILE%\Downloads\darimaa-bot-0.6.0.zip moodle@SERVER-IP:~/
+scp %USERPROFILE%\Downloads\darimaa-bot-0.7.0.zip moodle@SERVER-IP:~/
 ```
 
 Сервер дээр:
@@ -44,7 +45,7 @@ scp %USERPROFILE%\Downloads\darimaa-bot-0.6.0.zip moodle@SERVER-IP:~/
 ```bash
 sudo apt install -y python3-venv unzip
 sudo useradd --system --home /opt/darimaa-bot --shell /usr/sbin/nologin darimaa
-sudo unzip ~/darimaa-bot-0.6.0.zip -d /opt/
+sudo unzip ~/darimaa-bot-0.7.0.zip -d /opt/
 sudo python3 -m venv /opt/darimaa-bot/venv
 sudo /opt/darimaa-bot/venv/bin/pip install -r /opt/darimaa-bot/requirements.txt
 sudo cp /opt/darimaa-bot/.env.example /opt/darimaa-bot/.env
@@ -150,6 +151,16 @@ Moodle чинь https-гүй, эсвэл зөвхөн IP хаягаар нээг
 
 `OPENAI_API_KEY`, `OPENAI_MODEL` хоёулаа хоосон бол бот AI-гүй ажиллана.
 
+### Оюутанд мессеж (0.7.0)
+
+Багш «Хатнаа руу хичээлдээ суугаарай гэж Moodle чатаар явуул» гэж бичвэл:
+
+1. AI оюутныг нэрээр нь хайна (`local_darimaa_find_students`). Олон оюутан таарвал алийг нь гэж асууна.
+2. Мессежийн ноорог бичнэ. Бот багшид «Хэнд, ямар хичээл, ямар текст» гэдгийг **Тийм, явуул / Болих** товчтой харуулна.
+3. Багш **Тийм, явуул** дарсны дараа л мессеж багшийн нэрээр Moodle чатаар явна (`local_darimaa_send_message`). Оюутан Moodle чатаас хариулж болно.
+
+Ноорог 30 минут хадгалагдана. Товчийг хоёр дахь удаа дарахад дахин явахгүй. Өөр хүн тэр товчийг ашиглаж чадахгүй. Moodle-ийн дүрэм хэвээр үйлчилнэ: багш тухайн хичээлд оюутныг харах эрхтэй байх ёстой, оюутны мессежийн тохиргоо хүндэтгэгдэнэ.
+
 ## 4. Meta тал
 
 1. Туршилтад зориулж Facebook Page нээнэ, эсвэл байгаа Page-ээ ашиглана. Тэр Page-д ManyChat зэрэг өөр бот холбоотой бол туршилтад шинэ Page нээх нь дээр.
@@ -213,7 +224,34 @@ Moodle чинь https-гүй, эсвэл зөвхөн IP хаягаар нээг
 
 Оюутны код Moodle-ийн аль талбарт байгааг plugin-ий тохиргооноос сонгоно (Site administration → Plugins → Local plugins → Teacher & Student Assistant → Student code field).
 
+## Сервер дээр шинэчлэх (git)
+
+Шинэ хувилбар бүрт zip хуулах шаардлагагүй. Нэг удаа тохируулаад дараа нь нэг тушаалаар шинэчилнэ.
+
+Нэг удаа:
+
+```bash
+sudo apt install -y git rsync
+sudo git clone https://github.com/khuygbaataro/Diploma.git /opt/darimaa-src
+```
+
+Шинэчлэх бүрт:
+
+```bash
+sudo bash /opt/darimaa-src/tools/server_update.sh
+```
+
+Скрипт GitHub-аас шинэ кодыг татаж, ботыг `/opt/darimaa-bot` руу хуулна (`.env`, `venv` хэвээр үлдэнэ), Python сангуудыг суулгаж, ботыг дахин ажиллуулна. Дараа нь plugin-ийг Moodle руу хуулж, Moodle-ийн upgrade-ийг ажиллуулна. Moodle `/var/www/moodle`-оос өөр газар байвал: `sudo MOODLE_DIR=/зам bash /opt/darimaa-src/tools/server_update.sh`.
+
 ## Өөрчлөлт
+
+### 0.7.0 (2026-11-23)
+
+Оюутанд мессеж, git-ээр шинэчлэх. Plugin-ий 0.6.0 ба түүнээс шинэ хувилбар шаардлагатай.
+
+- Багшийн хүсэлтээр AI нэг оюутанд Moodle чатын мессеж бэлдэнэ. Багш «Тийм, явуул» дарсны дараа л явна.
+- AI оюутныг нэрээр хайж чадна. Нэр, код AI руу явахгүй хэвээр.
+- `tools/server_update.sh`: сервер дээр нэг тушаалаар бот, plugin хоёуланг шинэчилнэ.
 
 ### 0.6.0 (2026-11-23)
 

@@ -107,3 +107,20 @@ class MoodleClient:
             courseid=courseid,
             days=days,
         )
+
+    # The two functions below need plugin 0.6.0 or later.
+
+    async def find_students(self, externalid: str, query: str) -> dict[str, Any]:
+        """Students of the teacher's courses whose name or code contains the text."""
+        return await self.call("local_darimaa_find_students", channel=self.channel, externalid=externalid, query=query)
+
+    async def send_message(self, externalid: str, courseid: int, userid: int, message: str) -> dict[str, Any]:
+        """A Moodle chat message from the teacher to a student. Only after the teacher confirmed it."""
+        return await self.call(
+            "local_darimaa_send_message",
+            channel=self.channel,
+            externalid=externalid,
+            courseid=courseid,
+            userid=userid,
+            message=message,
+        )
