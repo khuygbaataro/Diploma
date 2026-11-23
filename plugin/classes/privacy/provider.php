@@ -69,6 +69,7 @@ class provider implements
             'fullname' => 'privacy:metadata:bot:fullname',
             'courseactivity' => 'privacy:metadata:bot:courseactivity',
             'quizmarks' => 'privacy:metadata:bot:quizmarks',
+            'studentid' => 'privacy:metadata:bot:studentid',
         ], 'privacy:metadata:bot');
 
         // What the bot passes on to the chat app when it answers.
@@ -82,6 +83,12 @@ class provider implements
             'courseactivity' => 'privacy:metadata:chatapps:courseactivity',
             'quizmarks' => 'privacy:metadata:chatapps:quizmarks',
         ], 'privacy:metadata:chatapps');
+
+        // What the bot sends an AI service when the site turns its AI helper on.
+        $collection->add_external_location_link('aiservice', [
+            'question' => 'privacy:metadata:aiservice:question',
+            'reports' => 'privacy:metadata:aiservice:reports',
+        ], 'privacy:metadata:aiservice');
 
         $collection->add_subsystem_link('core_message', [], 'privacy:metadata:coremessage');
 

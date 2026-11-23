@@ -24,6 +24,7 @@ use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use core_privacy\tests\provider_testcase;
+use local_darimaa\external\find_students;
 use local_darimaa\external\get_attention;
 use local_darimaa\external\get_inactive_students;
 use local_darimaa\external\get_quiz_topic_results;
@@ -65,7 +66,10 @@ final class provider_test extends provider_testcase {
         foreach (provider::get_metadata(new collection('local_darimaa'))->get_collection() as $item) {
             $items[$item->get_name()] = $item;
         }
-        $this->assertEqualsCanonicalizing(['local_darimaa_links', 'bot', 'chatapps', 'core_message'], array_keys($items));
+        $this->assertEqualsCanonicalizing(
+            ['local_darimaa_links', 'bot', 'chatapps', 'aiservice', 'core_message'],
+            array_keys($items)
+        );
 
         // Every column of the link table except the record id.
         $this->assertInstanceOf(database_table::class, $items['local_darimaa_links']);
@@ -77,7 +81,7 @@ final class provider_test extends provider_testcase {
         $botfields = array_keys($items['bot']->get_privacy_fields());
         $teacherreports = ['courses', 'studentcode', 'fullname', 'courseactivity', 'quizmarks'];
         $this->assertEqualsCanonicalizing(
-            array_merge(['firstname', 'timezone', 'isteacher', 'deadlines', 'missing'], $teacherreports),
+            array_merge(['firstname', 'timezone', 'isteacher', 'deadlines', 'missing', 'studentid'], $teacherreports),
             $botfields
         );
         $this->assertInstanceOf(external_location::class, $items['chatapps']);
@@ -108,6 +112,15 @@ final class provider_test extends provider_testcase {
                 $this->assertContains($declaredas[$field], $chatfields, $field);
             }
         }
+
+        // The student search gives the bot the user id as well; the bot never passes it on to the chat app.
+        $searchfields = array_keys(find_students::execute_returns()->keys['students']->content->keys);
+        $this->assertEqualsCanonicalizing(['userid', 'code', 'fullname', 'courseid', 'coursename'], $searchfields);
+        $this->assertNotContains('studentid', $chatfields);
+
+        // The AI service gets the question and report numbers, never names or codes.
+        $this->assertInstanceOf(external_location::class, $items['aiservice']);
+        $this->assertEqualsCanonicalizing(['question', 'reports'], array_keys($items['aiservice']->get_privacy_fields()));
 
         // Every field about a person that the user functions return is declared for the bot.
         foreach ([get_user::class, link_account::class] as $function) {

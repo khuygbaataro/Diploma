@@ -253,7 +253,7 @@ class reminder_sender {
     }
 
     /**
-     * Sends the reminder as a Moodle chat message from one user to another.
+     * Sends a Moodle chat message from one user to another: a reminder, or a teacher's message from the bot.
      *
      * Moodle decides whether the sender may message the student: the sender needs the capability to
      * send messages, and the student's privacy settings and blocked users are respected.
@@ -263,7 +263,7 @@ class reminder_sender {
      * @param string $html The message, as HTML.
      * @return bool Whether the message was sent.
      */
-    private static function send_chat(\stdClass $from, \stdClass $to, string $html): bool {
+    public static function send_chat(\stdClass $from, \stdClass $to, string $html): bool {
         if (!\core_message\api::can_send_message((int) $to->id, (int) $from->id)) {
             return false;
         }

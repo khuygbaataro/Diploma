@@ -85,6 +85,18 @@ $functions = [
         'type' => 'read',
         'capabilities' => 'local/darimaa:botaccess',
     ],
+    'local_darimaa_find_students' => [
+        'classname' => \local_darimaa\external\find_students::class,
+        'description' => 'Finds students of a linked teacher\'s courses by part of their name or student code.',
+        'type' => 'read',
+        'capabilities' => 'local/darimaa:botaccess',
+    ],
+    'local_darimaa_send_message' => [
+        'classname' => \local_darimaa\external\send_message::class,
+        'description' => 'Sends a Moodle chat message from a linked teacher to a student of their course.',
+        'type' => 'write',
+        'capabilities' => 'local/darimaa:botaccess',
+    ],
 ];
 
 $services = [
@@ -101,6 +113,8 @@ $services = [
             'local_darimaa_get_inactive_students',
             'local_darimaa_get_quiz_topic_results',
             'local_darimaa_get_attention',
+            'local_darimaa_find_students',
+            'local_darimaa_send_message',
         ],
         'requiredcapability' => 'local/darimaa:botaccess',
         'restrictedusers' => 0,

@@ -53,9 +53,9 @@ final class services_test extends \advanced_testcase {
     }
 
     /**
-     * The service offers ten functions, all only for the bot. The four reports for teachers are read-only.
+     * The service offers twelve functions, all only for the bot. Reports and the student search are read-only.
      */
-    public function test_service_has_ten_functions(): void {
+    public function test_service_has_twelve_functions(): void {
         global $DB;
 
         $functions = [];
@@ -73,8 +73,10 @@ final class services_test extends \advanced_testcase {
             'local_darimaa_get_inactive_students' => 'read',
             'local_darimaa_get_quiz_topic_results' => 'read',
             'local_darimaa_get_attention' => 'read',
+            'local_darimaa_find_students' => 'read',
+            'local_darimaa_send_message' => 'write',
         ];
-        $this->assertCount(10, $services['Darimaa bot']['functions']);
+        $this->assertCount(12, $services['Darimaa bot']['functions']);
         $this->assertSame(array_keys($expected), $services['Darimaa bot']['functions']);
         $this->assertSame($expected, array_map(static fn(array $function): string => $function['type'], $functions));
         foreach ($functions as $name => $function) {
@@ -82,7 +84,7 @@ final class services_test extends \advanced_testcase {
             $this->assertTrue(class_exists($function['classname']), $name);
         }
 
-        // Moodle installed all ten and put them in the service.
+        // Moodle installed all twelve and put them in the service.
         $service = $DB->get_record('external_services', ['shortname' => 'local_darimaa_bot'], '*', MUST_EXIST);
         $inservice = $DB->get_fieldset_select(
             'external_services_functions',
@@ -91,6 +93,6 @@ final class services_test extends \advanced_testcase {
             ['serviceid' => $service->id]
         );
         $this->assertEqualsCanonicalizing(array_keys($expected), $inservice);
-        $this->assertSame(10, $DB->count_records('external_functions', ['component' => 'local_darimaa']));
+        $this->assertSame(12, $DB->count_records('external_functions', ['component' => 'local_darimaa']));
     }
 }
