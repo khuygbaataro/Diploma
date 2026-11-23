@@ -103,3 +103,10 @@ def test_example_file_lists_the_telegram_settings_as_placeholders():
     example = load_env_file(BOT_ROOT / ".env.example")
     assert example["TELEGRAM_BOT_TOKEN"] == "paste-the-bot-token-here"
     assert example["TELEGRAM_SECRET"] == "make-up-a-long-random-text"
+
+
+def test_example_file_leaves_the_ai_off():
+    example = load_env_file(BOT_ROOT / ".env.example")
+    # Empty values: copying the example never turns the AI on or holds a key.
+    assert example["OPENAI_API_KEY"] == "" and example["OPENAI_MODEL"] == ""
+    assert example["AI_QUESTIONS_PER_HOUR"] == "20"

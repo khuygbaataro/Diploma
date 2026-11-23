@@ -15,6 +15,7 @@ import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
+from .ai import Assistant, OpenAIClient
 from .config import Settings
 from .conversation import Bot
 from .messenger import MessengerClient, parse_events, verify_signature
@@ -35,11 +36,14 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with httpx.AsyncClient(transport=transport) as http:
-            options = {
+            options: dict[str, Any] = {
                 "default_timezone": settings.default_timezone,
                 "weak_topic_below": settings.weak_topic_below,
                 "exam_points": settings.exam_points,
             }
+            if settings.ai_enabled:
+                client = OpenAIClient(settings.openai_url, settings.openai_api_key, settings.openai_model, http)
+                options["ai"] = Assistant(client, settings.ai_per_hour)
             apps = []
             if settings.messenger_enabled:
                 moodle = MoodleClient(settings.moodle_url, settings.moodle_token, "messenger", http)
@@ -51,7 +55,8 @@ def create_app(settings: Settings | None = None, transport: httpx.AsyncBaseTrans
                 state["telegram"] = TelegramClient(settings.telegram_api_url, settings.telegram_token, http)
                 state["telegram_bot"] = Bot(moodle, state["telegram"], app_name="Telegram", **options)
                 apps.append("Telegram")
-            log.info("Teacher & Student Assistant bot started for %s (%s)", settings.moodle_url, ", ".join(apps))
+            log.info("Teacher & Student Assistant bot started for %s (%s)%s", settings.moodle_url, ", ".join(apps),
+                     f", AI: {settings.openai_model}" if settings.ai_enabled else "")
             yield
         state.clear()
 

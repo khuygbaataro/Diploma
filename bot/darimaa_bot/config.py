@@ -35,6 +35,10 @@ class Settings:
     telegram_token: str = ""
     telegram_secret: str = ""
     telegram_api_url: str = "https://api.telegram.org"
+    openai_api_key: str = ""
+    openai_model: str = ""
+    openai_url: str = "https://api.openai.com/v1"
+    ai_per_hour: int = 20  # free questions each chat account may ask the AI assistant in an hour
     graph_url: str = "https://graph.facebook.com"
     graph_version: str = "v23.0"
     default_timezone: str = "Asia/Ulaanbaatar"
@@ -49,6 +53,10 @@ class Settings:
     @property
     def telegram_enabled(self) -> bool:
         return bool(self.telegram_token)
+
+    @property
+    def ai_enabled(self) -> bool:
+        return bool(self.openai_api_key and self.openai_model)
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "Settings":
@@ -84,6 +92,7 @@ class Settings:
 
         messenger = group(["FB_PAGE_ACCESS_TOKEN", "FB_APP_SECRET", "FB_VERIFY_TOKEN"])
         telegram = group(["TELEGRAM_BOT_TOKEN", "TELEGRAM_SECRET"])
+        ai = group(["OPENAI_API_KEY", "OPENAI_MODEL"])
         if not any(messenger.values()) and not any(telegram.values()):
             raise RuntimeError(
                 "Set the Messenger settings (FB_...), the Telegram settings (TELEGRAM_...), or both. See .env.example."
@@ -102,6 +111,10 @@ class Settings:
             telegram_token=telegram["TELEGRAM_BOT_TOKEN"],
             telegram_secret=telegram["TELEGRAM_SECRET"],
             telegram_api_url=merged.get("TELEGRAM_API_URL", cls.telegram_api_url).rstrip("/") or cls.telegram_api_url,
+            openai_api_key=ai["OPENAI_API_KEY"],
+            openai_model=ai["OPENAI_MODEL"],
+            openai_url=merged.get("OPENAI_URL", cls.openai_url).rstrip("/") or cls.openai_url,
+            ai_per_hour=int(number("AI_QUESTIONS_PER_HOUR", cls.ai_per_hour, 1000)),
             graph_url=merged.get("FB_GRAPH_URL", cls.graph_url).rstrip("/") or cls.graph_url,
             graph_version=merged.get("FB_GRAPH_VERSION", cls.graph_version) or cls.graph_version,
             default_timezone=merged.get("BOT_TIMEZONE", cls.default_timezone) or cls.default_timezone,

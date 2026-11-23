@@ -113,6 +113,13 @@ class TelegramClient:
                 body["reply_markup"] = {"inline_keyboard": rows}
             await self.call("sendMessage", body)
 
+    async def typing(self, recipient_id: str) -> None:
+        """Shows "typing…" in the chat. Failures are ignored: it is only a courtesy."""
+        try:
+            await self.call("sendChatAction", {"chat_id": recipient_id, "action": "typing"})
+        except TelegramError:
+            pass
+
     async def answer_callback(self, callback_id: str) -> None:
         """Stops the spinner on a tapped button. Failures are ignored: it is only a courtesy."""
         try:

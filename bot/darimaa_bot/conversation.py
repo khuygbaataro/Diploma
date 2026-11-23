@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 
 from . import texts
+from .ai import AIError, Assistant
 from .memory import RateLimiter, TTLSet
 from .messenger import Incoming, MessengerClient, Reply, account_ref
 from .moodle import MoodleClient, MoodleError
@@ -26,6 +27,7 @@ MAX_STUDENTS = 15
 MAX_CHOICES = 10
 INACTIVE_DAYS = 7
 ATTENTION_DAYS = 7
+AI_MIN_WORDS = 5  # with the assistant on, messages this long go to it before the keyword rules
 
 # The teacher reports start with a course. Each one continues with this payload plus the course id.
 COURSE_STEPS = {"ATTENTION": "ATTENTION_COURSE", "INACTIVE": "INACTIVE_COURSE", "QUIZ": "QUIZ_COURSE"}
@@ -103,6 +105,7 @@ class Bot:
         weak_topic_below: float = 60.0,
         exam_points: float = 30.0,
         app_name: str = "Messenger",
+        ai: Assistant | None = None,
     ) -> None:
         self.moodle = moodle
         self.messenger = messenger
@@ -111,6 +114,7 @@ class Bot:
         self.weak_topic_below = weak_topic_below
         self.exam_points = exam_points
         self.app_name = app_name
+        self.ai = ai
         self.handled = TTLSet(ttl=3600)
         self.code_attempts = RateLimiter(limit=5, window=3600)
         self.recent_sends = TTLSet(ttl=600)
@@ -153,6 +157,11 @@ class Bot:
         if event.kind == "other":
             return [Reply(texts.NON_TEXT, self.menu(user))]
 
+        # A full sentence is a question for the assistant, even when it has a word the rules know:
+        # "Who is most behind in Biology?" is not the teacher's own overdue work.
+        if self.ai and event.kind == "text" and not event.payload and len(event.text.split()) >= AI_MIN_WORDS:
+            return await self.ask_ai(sender, user, event.text)
+
         action = event.payload or intent(event.text)
         name, _, argument = action.partition(":")
 
@@ -193,7 +202,25 @@ class Bot:
             return [Reply(texts.UNLINK_DONE)]
         if name == "CANCEL":
             return [Reply(texts.CANCELLED, self.menu(user))]
+        if self.ai and event.kind == "text" and not event.payload:
+            return await self.ask_ai(sender, user, event.text)
         return [Reply(texts.UNKNOWN, self.menu(user))]
+
+    async def ask_ai(self, sender: str, user: dict[str, Any], question: str) -> list[Reply]:
+        """Answers a free question with the AI assistant. It only reads; nothing is sent to students."""
+        assert self.ai is not None
+        if not self.ai.allow(sender):
+            return [Reply(texts.AI_TOO_MANY, self.menu(user))]
+        typing = getattr(self.messenger, "typing", None)
+        if typing:
+            await typing(sender)
+        try:
+            answer = await self.ai.answer(question, user, self.moodle, sender, self.zone(user.get("timezone")),
+                                          self.clock())
+        except (AIError, httpx.HTTPError) as error:
+            log.warning("The AI assistant could not answer account %s: %s", account_ref(sender), error)
+            return [Reply(texts.AI_ERROR, self.menu(user))]
+        return [Reply(f"{answer}\n\n{texts.AI_NOTE}", self.menu(user))]
 
     async def link(self, sender: str, code: str) -> list[Reply]:
         if not self.code_attempts.allow(sender):
