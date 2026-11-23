@@ -65,9 +65,9 @@ class ScriptRunTest(unittest.TestCase):
         write(self.bot / "venv" / "bin" / "pip", f'#!/bin/sh\necho "pip $*" >> "{self.calls}"\n', executable=True)
         write(self.bot / "old_file.py", "removed\n")
 
-        # Moodle 5.1 layout.
+        # Moodle 5.1 layout: plugins in public/, command line scripts in admin/cli at the top.
         self.moodle = self.work / "moodle"
-        write(self.moodle / "public" / "admin" / "cli" / "upgrade.php", "<?php\n")
+        write(self.moodle / "admin" / "cli" / "upgrade.php", "<?php\n")
         (self.moodle / "public" / "local").mkdir(parents=True)
 
         # Commands that must not touch the real system.
@@ -96,8 +96,17 @@ class ScriptRunTest(unittest.TestCase):
         self.assertIn("pull --ff-only", calls)
         self.assertIn("pip install --quiet -r", calls)
         self.assertIn("systemctl restart darimaa-bot", calls)
-        self.assertIn("upgrade.php --non-interactive", calls)
-        self.assertIn("purge_caches.php", calls)
+        self.assertIn(f"php {self.moodle}/admin/cli/upgrade.php --non-interactive", calls)
+        self.assertIn(f"php {self.moodle}/admin/cli/purge_caches.php", calls)
+
+    def test_moodle_5_0_layout(self) -> None:
+        shutil.rmtree(self.moodle)
+        write(self.moodle / "admin" / "cli" / "upgrade.php", "<?php\n")
+        (self.moodle / "local").mkdir(parents=True)
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.moodle / "local" / "darimaa" / "version.php").exists())
+        self.assertIn(f"php {self.moodle}/admin/cli/upgrade.php --non-interactive", self.calls.read_text())
 
     def test_refuses_without_moodle(self) -> None:
         shutil.rmtree(self.moodle)
